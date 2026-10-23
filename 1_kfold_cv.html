@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<script>
+(function(){var KEY='it2_lang',AVAILABLE=['ko'],LANGS=['ko','en','zh','ja','uz','ru'];
+var cur=document.documentElement.lang||'ko';cur=cur.slice(0,2);
+function root(){var p=location.pathname;var dir=p.replace(/[^\/]*$/,'');if(cur!=='ko'){dir=dir.replace(/[^\/]+\/$/,'')}return dir}
+function file(){var f=location.pathname.split('/').pop();if(!f)f='index.html';if(!/\.html?$/.test(f))f+='.html';return f}
+function url(l){return root()+(l==='ko'?'':l+'/')+file()+location.search.replace(/[?&]lang=[^&]*/,'').replace(/^&/,'?')+location.hash}
+function exists(u,cb){if(location.protocol==='file:'){cb(true);return}try{fetch(u,{method:'HEAD'}).then(function(r){cb(!(r.status===404||r.status===410))},function(){cb(true)})}catch(e){cb(true)}}
+function save(l){try{localStorage.setItem(KEY,l)}catch(e){}}
+function drop(){try{localStorage.removeItem(KEY)}catch(e){}}
+window.itSetLang=function(l,manual){if(l===cur)return;
+ if(AVAILABLE.indexOf(l)<0){if(manual){var n=document.getElementById('lang-note');if(n){n.hidden=false;n.textContent='이 언어판은 아직 준비 중입니다 ('+l+'). 한국어판을 보여 드립니다.'}}else{drop()}return}
+ var u=url(l);exists(u,function(ok){if(ok){if(manual)save(l);location.href=u}else{drop();if(manual){var n=document.getElementById('lang-note');if(n){n.hidden=false;n.textContent='언어판 파일을 찾지 못했습니다: '+u}}}})};
+var q=(location.search.match(/[?&]lang=([a-z]{2})/)||[])[1];
+if(q&&LANGS.indexOf(q)>=0){save(q);if(q!==cur)itSetLang(q,true);return}
+var s=null;try{s=localStorage.getItem(KEY)}catch(e){}
+if(s&&s!==cur){itSetLang(s,false);return}
+if(!s){var b=(navigator.language||'ko').slice(0,2);if(b!==cur&&AVAILABLE.indexOf(b)>=0)itSetLang(b,false)}
+})();
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>1편 · 증강 없이 5-Fold로 성능 재기 | 인슈어테크 #2 실전</title>
+<meta name="description" content="AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 1편. 모델 5개를 StratifiedKFold(5)로 다시 학습해 fold별 점수 5개와 평균 ± 표준편차를 낸다. 정확도만 보면 왜 위험한지 숫자로 본다.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Silkscreen&display=swap">
+<style>
+
+.say .av:has(img){background:#fff}
+.say .av img{display:block}
+img.scene{display:block;width:100%;max-width:720px;height:auto;aspect-ratio:9/5;object-fit:cover;border-radius:var(--r)}
+img.keyvis{display:block;width:100%;height:auto;aspect-ratio:1100/320;object-fit:cover;border-radius:var(--r)}
+img.pic{display:block;width:100%;height:auto;aspect-ratio:480/440;object-fit:cover;border-radius:6px}
+.crew .cf{background:#fff}
+.crew .cf img{width:100%;height:100%;object-fit:contain}
+.crew .moods button img{width:36px;height:36px;border-radius:7px;display:block}
+/* 레이아웃: 보상 센터 연구 노트 — 상단 바 · 히어로(그림 자리) · 육각 번호 섹션 · 카드형 실습 */
+:root{
+  --bg:#f6f5fb; --surface:#ffffff; --sunken:#eeecf7; --ink:#1d1a2e; --muted:#5d5873; --line:#dcd8ea;
+  --accent:#5b47c9; --accent-ink:#ffffff; --accent-soft:#ece8ff;
+  --core:#6a4fd8; --data:#c2417a; --seq:#13857f;
+  --c-no:#2f86c9; --c-claim:#d9730d; --c-3:#7b61d9; --c-4:#1f9e78;
+  --risk:#b4471b; --risk-bg:#fdeee6; --safe:#1f7a5c; --safe-bg:#e5f4ee; --warn:#9a620e; --warn-bg:#fbf1df;
+  --grid:#e6e3f0;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --f-pixel:"Silkscreen","IBM Plex Mono",monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12111a; --surface:#1b1a26; --sunken:#0e0d15; --ink:#ece9f7; --muted:#a29dba; --line:#2e2b40;
+  --accent:#a998ff; --accent-ink:#14121f; --accent-soft:#2a2547;
+  --core:#a48cf0; --data:#f07aaa; --seq:#4cc3b9;
+  --c-no:#3f8fd2; --c-claim:#d8742a; --c-3:#8a74e0; --c-4:#26a17c;
+  --risk:#f08a5d; --risk-bg:#3a1f16; --safe:#5fcf9f; --safe-bg:#14302a; --warn:#e3aa52; --warn-bg:#33270f;
+  --grid:#2a2738; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12111a; --surface:#1b1a26; --sunken:#0e0d15; --ink:#ece9f7; --muted:#a29dba; --line:#2e2b40;
+  --accent:#a998ff; --accent-ink:#14121f; --accent-soft:#2a2547;
+  --core:#a48cf0; --data:#f07aaa; --seq:#4cc3b9;
+  --c-no:#3f8fd2; --c-claim:#d8742a; --c-3:#8a74e0; --c-4:#26a17c;
+  --risk:#f08a5d; --risk-bg:#3a1f16; --safe:#5fcf9f; --safe-bg:#14302a; --warn:#e3aa52; --warn-bg:#33270f;
+  --grid:#2a2738; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.7;word-break:keep-all;overflow-wrap:break-word}
+a{color:var(--accent)}
+h1,h2,h3{line-height:1.3;text-wrap:balance;margin:0}
+p{margin:0}
+code,pre,.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:20px}
+nav.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+nav.top .wrap{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;padding-block:8px}
+nav.top .brand{font-weight:700;text-decoration:none;color:var(--ink);white-space:nowrap}
+nav.top .brand b{font-family:var(--f-pixel);font-weight:400;color:var(--accent);margin-left:4px}
+nav.top .links{display:flex;gap:2px 12px;flex-wrap:wrap;font-size:.86rem;flex:1;min-width:0}
+nav.top .links a{color:var(--muted);text-decoration:none}
+nav.top .links a:hover{color:var(--ink)}
+nav.top select{width:auto;font:inherit;font-size:.82rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+header.hero{padding-block:28px 20px}
+.hero-grid{display:grid;gap:18px}
+.series{display:flex;flex-wrap:wrap;gap:6px}
+.series a{font-size:.78rem;text-decoration:none;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--surface)}
+.series a.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.kicker{font-family:var(--f-pixel);font-size:.82rem;color:var(--accent);letter-spacing:.04em}
+h1{font-size:clamp(1.7rem,4.2vw,2.5rem);font-weight:700;letter-spacing:-.015em}
+.lead{font-size:1.06rem;color:var(--muted);max-width:68ch}
+.byline{font-size:.84rem;color:var(--muted)}
+.guide{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted)}
+.guide span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.chat{display:grid;gap:10px;max-width:760px}
+.say{display:flex;gap:12px;align-items:flex-start}
+.say .av{flex:0 0 52px;height:52px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:1.05rem;color:var(--accent-ink);background:var(--avc,var(--accent));position:relative;overflow:hidden}
+.say .av img{width:100%;height:100%;object-fit:cover;object-position:50% 18%}
+.say .av small{position:absolute;bottom:2px;left:0;right:0;font-size:.55rem;font-weight:500;text-align:center;opacity:.85}
+.say .sbub{background:var(--surface);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:8px 14px;min-width:0}
+.say .sbub b{font-size:.8rem;color:var(--muted);display:block}
+.say .sbub ul{margin:4px 0 0;padding-left:1.2em}
+.npc{display:inline-block;margin-left:6px;font-family:var(--f-pixel);font-size:.62rem;font-weight:400;letter-spacing:.06em;color:#3a2a00;background:#f2c94c;border:1px solid #b8901a;border-radius:3px;padding:0 5px;vertical-align:1px}
+.bomi{--avc:#d9730d}.actuary{--avc:#5b47c9}.fly{--avc:#13857f}.robo{--avc:#2f86c9}
+section.part{padding-block:34px 10px;border-top:1px solid var(--line);margin-top:26px}
+.part-head{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center;margin-bottom:16px}
+.hex{width:44px;height:50px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:var(--kc,var(--accent));color:#fff;display:grid;place-items:center;font-family:var(--f-pixel);font-size:1.05rem;grid-row:span 2}
+.part-head h2{font-size:1.4rem}
+.part-head h2 span.en{font-family:var(--f-pixel);font-weight:400;font-size:.72rem;color:var(--muted);margin-left:8px;letter-spacing:.03em}
+.part-head p{color:var(--muted);font-size:.94rem}
+.body{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.body>p,.body>ul,.body>ol{max-width:72ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:grid;gap:12px;min-width:0;align-content:start}
+.card h3{font-size:1.02rem}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.76rem;color:var(--muted);font-weight:600;letter-spacing:.02em;white-space:nowrap}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+tr.hl td{background:var(--accent-soft);font-weight:600}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit}
+.btn{text-decoration:none;display:inline-block;font-size:.9rem;font-weight:600;border-radius:8px;padding:7px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn[aria-pressed="true"],.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{font-size:.8rem;padding:3px 10px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dial{display:grid;gap:4px;min-width:0;align-content:start}
+.dial label{font-size:.86rem;font-weight:500;display:flex;justify-content:space-between;gap:8px}
+.dial label output{font-family:var(--f-mono);color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select,input[type=text],input[type=number]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-width:0}
+.canvas-box{position:relative;min-width:0}
+.canvas-box canvas{width:100%;display:block;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.cap{font-size:.86rem;color:var(--muted)}
+.cap b{color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:.76rem;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-120%);z-index:5}
+.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:8px}
+.stat>div{background:var(--sunken);border-radius:6px;padding:8px 12px;display:grid}
+.stat .l{font-size:.74rem;color:var(--muted)}
+.stat .v{font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:6.5em 1fr 4.2em;gap:8px;align-items:center;font-size:.84rem}
+.bar .track{position:relative;height:16px;background:var(--sunken);border-radius:4px}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;background:var(--c,var(--accent));transition:width .25s}
+.bar .base{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.bar .v{font-family:var(--f-mono);text-align:right}
+@media (prefers-reduced-motion:reduce){.bar .fill{transition:none}}
+.cm{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;max-width:440px;font-variant-numeric:tabular-nums}
+.cm .h{font-size:.76rem;color:var(--muted);font-weight:600;display:flex;align-items:end;padding:2px 4px}
+.cm .rh{align-items:center}
+.cm .c{border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:grid;background:var(--surface)}
+.cm .c b{font-size:1.15rem}
+.cm .c span{font-size:.74rem;color:var(--muted)}
+.cm .c.ok{background:var(--safe-bg);border-color:transparent}
+.cm .c.bad{background:var(--risk-bg);border:2px solid var(--risk)}
+.cm .c.bad span{color:var(--risk);font-weight:600}
+.pill{display:inline-block;font-size:.74rem;font-weight:600;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.pill.risk{background:var(--risk-bg);color:var(--risk)}.pill.safe{background:var(--safe-bg);color:var(--safe)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.pass{background:var(--safe-bg);color:var(--safe)}.pill.fail{background:var(--risk-bg);color:var(--risk)}
+.note{border-left:3px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 6px 6px 0;font-size:.9rem}
+.note.info{border-color:var(--accent);background:var(--accent-soft)}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px;display:grid;gap:10px}
+.q .qt{font-weight:600}
+.q .opts{display:grid;gap:6px}
+.q .opts button{text-align:left;font-size:.92rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+.q .opts button.right{border-color:var(--safe);background:var(--safe-bg)}
+.q .opts button.wrong{border-color:var(--risk);background:var(--risk-bg)}
+.q .fb{font-size:.9rem}
+.codebox{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.codebox .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);background:var(--sunken);padding:6px 6px 0}
+.codebox .tabs button{border:0;background:none;padding:6px 12px;border-radius:6px 6px 0 0;cursor:pointer;color:var(--muted);font-size:.84rem;font-family:var(--f-mono)}
+.codebox .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:500}
+.codebox .tools{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);align-items:center}
+.codebox .tools span{font-size:.78rem;color:var(--muted);flex:1;min-width:12em}
+.codebox pre{margin:0;padding:14px 16px;overflow:auto;max-height:440px;font-size:.8rem;line-height:1.55;white-space:pre}
+details.run{border:1px solid var(--line);border-radius:var(--r);background:var(--sunken)}
+details.run summary{cursor:pointer;padding:8px 14px;font-size:.88rem;font-weight:500}
+details.run pre{margin:0;padding:10px 16px 14px;overflow:auto;font-size:.78rem;line-height:1.5}
+.gloss{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px}
+.gloss div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px}
+.gloss dt{font-weight:600}.gloss dd{margin:2px 0 0;font-size:.88rem;color:var(--muted)}
+.gloss dd i{font-style:normal;color:var(--ink)}
+.prompt pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunken);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;font-size:.8rem;max-height:360px;overflow:auto;margin:0}
+.teach-link{display:inline-block;font-weight:600;text-decoration:none;border:1px solid var(--accent);border-radius:8px;padding:8px 14px}
+section.outro{margin-top:40px;padding-block:30px;border-top:1px solid var(--line)}
+.outro .scene{width:100%;max-width:720px;aspect-ratio:720/400;border-radius:var(--r)}
+.placeholder{display:grid;place-items:center;text-align:center;background:repeating-linear-gradient(135deg,var(--sunken) 0 12px,var(--surface) 12px 24px);border:1px dashed var(--line);color:var(--muted);font-size:.82rem;padding:10px}
+.nav-eps{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+footer{border-top:1px solid var(--line);margin-top:30px;padding-block:22px 40px;font-size:.82rem;color:var(--muted)}
+footer .wrap{display:grid;gap:8px}
+.robo-w{align-items:center}
+.robo-w .av{flex-basis:64px;height:64px;font-size:1.4rem}
+.robo-w[data-st="wrong"] .av{--avc:var(--risk)}
+.robo-w[data-st="success"] .av{--avc:var(--safe)}
+.robo-w[data-st="confused"] .av{--avc:var(--warn)}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.player input[type=range]{flex:1;min-width:140px}
+.stamp{justify-self:start;border:3px double currentColor;border-radius:4px;padding:6px 16px;font-weight:700;font-size:1.35rem;letter-spacing:.04em;transform:rotate(-2deg)}
+.stamp.risk{color:var(--risk)}.stamp.safe{color:var(--safe)}.stamp.reject{color:var(--warn)}
+@media (max-width:560px){body{font-size:15px}.part-head h2{font-size:1.2rem}.say .av{flex-basis:44px;height:44px}}
+
+.task{border:1px solid var(--line);border-left:4px solid var(--data);background:var(--surface);border-radius:0 var(--r) var(--r) 0;padding:14px 18px;display:grid;gap:8px}
+.task .tt{font-family:var(--f-pixel);font-size:.8rem;color:var(--data)}
+.task ul{margin:0;padding-left:1.2em}
+.answer{border:2px dashed var(--accent);border-radius:var(--r);padding:14px 18px;display:grid;gap:10px;background:var(--surface)}
+.answer .tt{font-weight:700;color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{font-size:.76rem;border:1px solid var(--line);border-radius:999px;padding:1px 9px;background:var(--sunken)}
+.chips span.ban{border-color:var(--risk);color:var(--risk);background:var(--risk-bg)}
+</style>
+</head>
+<body>
+<nav class="top"><div class="wrap"><a class="brand" href="index.html">인슈어테크 #2 실전<b>· 1</b></a><div class="links"><a href="#task">과제</a><a href="#split">5조각 나누기</a><a href="#folds">fold별 점수</a><a href="#trap">정확도의 함정</a><a href="#devices">증강 없는 장치</a><a href="#answer">답안 틀</a><a href="#check">확인 문제</a><a href="#practice">코드</a><a href="#prompt">프롬프트</a><a href="#glossary">용어</a><a href="answers.html#a1">교육자용 정답</a></div><select id="lang-sel" aria-label="언어 선택" onchange="itSetLang(this.value,true)"><option value="ko" selected>한국어</option><option value="en">English</option><option value="zh">中文</option><option value="ja">日本語</option><option value="uz">O'zbekcha</option><option value="ru">Русский</option></select></div></nav><header class="hero"><div class="wrap hero-grid"><div class="series" aria-label="시리즈 편 목록"><a href="1_kfold_cv.html" class="on" aria-current="page">1 5-Fold 검증</a><a href="2_conditional_accuracy.html" class="">2 청구자만 정확도</a><a href="3_problems_fixes.html" class="">3 문제점·개선</a><a href="4_html_deploy.html" class="">4 HTML 배포</a><a href="5_similar_cases.html" class="">5 유사 사례</a></div><p class="kicker">EPISODE 1 · 과제 문항 1 · 해설형 · Stratified 5-fold CV</p>
+<h1>증강 없이 5-Fold로 성능 재기</h1><p class="lead">과제 문항 1은 “데이터 증강 없이, 5-Fold 교차검증으로” 성능을 내라고 합니다. 이 편은 전체 63,326건을 다섯 조각으로 나눠 모델 다섯 개를 <b>다섯 번씩</b> 다시 학습하고, fold별 점수 5개와 평균 ± 표준편차를 만듭니다. 그리고 정확도 하나만 보고하면 왜 위험한지 숫자로 보여 줍니다.</p><div class="chat"><div class="say bomi"><div class="av" data-face="curious" aria-hidden="true"><img src="assets/av_bomi_curious.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>조교</b><p>1편 시리즈에서는 시험 데이터 한 번으로 쟀잖아요. 그걸로 내면 안 돼요?</p></div></div><div class="say actuary"><div class="av" data-face="explain" aria-hidden="true"><img src="assets/av_actuary_explain.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>박사<span class="npc" title="NPC">NPC</span></b><p>(같은 자리에서 손바닥을 든다) …한 번 잰 숫자는 운이 섞입니다. 다섯 번 재서 평균과 흔들림을 같이 내야 합니다. 그리고, 기준선부터 봅시다.</p></div></div><div class="say robo"><div class="av" data-face="thinking" aria-hidden="true"><img src="assets/av_robo_thinking.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>머니로보</b><p>삐빅. 다섯 번 재면 출장비도 다섯 배인가요?</p></div></div></div><p class="byline">글 · 안상선 ((주)M-Robo 대표) · AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전</p><div class="guide"><span style="--c:var(--c-claim)">청구 고객</span><span style="--c:var(--c-no)">미청구 고객</span><span style="--c:var(--ink)">평균</span><span style="--c:var(--muted)">기준선</span></div></div></header><section class="part" id="task"><div class="wrap"><div class="part-head" style="--kc:var(--data)"><div class="hex">0</div><h2>과제 문항 1<span class="en">Assignment 1</span></h2><p>무엇을 내야 하는지 먼저 확인합니다.</p></div><div class="body"><div class="task"><span class="tt">ASSIGNMENT · 문항 1</span><h3>데이터 증강 없이 5-Fold Validation 기준 정확도 산출</h3><div class=chips><span class="ban">증강 금지</span><span class="">StratifiedKFold = 5</span><span class="">모델 2개 이상</span></div><ul><li>데이터 증강(SMOTE, ADASYN, 오버샘플링, 합성 데이터 생성 등)을 일절 사용하지 않고 원본 데이터만 사용</li><li>성능은 5-Fold 교차검증 기준. 홀드아웃 1회 결과만 제출하면 감점</li><li>최소 2개 이상의 분류 모델에 대해 Fold별 점수 5개 + 평균 ± 표준편차를 표로 제출</li><li>Accuracy 외에 Precision, Recall, F1, ROC-AUC 를 함께 산출</li><li>이 데이터에서 Accuracy만 보고하면 왜 위험한지 수치 근거와 함께 서술</li><li>불균형을 “증강 없이” 다루기 위해 어떤 장치를 썼는지 명시하고 근거를 밝힘</li></ul></div><p>이 편에서는 모델 <b>5개</b>(KNN · SVC · 선형 SVM · 로지스틱 · 의사결정나무)로 위 여섯 가지를 모두 채웁니다. 숫자는 모두 정식 코드 f1.py 를 실제로 실행한 결과입니다.</p></div></div></section><section class="part" id="split"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">1</div><h2>다섯 조각으로 나누기<span class="en">Stratified 5-fold</span></h2><p>과제가 StratifiedKFold(n_splits=5, shuffle=True)를 요구하는 이유.</p></div><div class="body"><p>5-Fold 교차검증은 데이터를 다섯 조각으로 나눠, 한 조각씩 돌아가며 시험지로 쓰고 나머지 네 조각으로 학습합니다. 고객 한 명은 정확히 한 번 시험을 봅니다. 그런데 <b>어떻게 나누느냐</b>에 따라 fold마다 청구 고객 수가 크게 달라집니다.</p>
+<div class="btns" role="group" aria-label="나누는 방법"><button class="btn" data-split="noshuf" aria-pressed="false">KFold · 섞지 않음</button><button class="btn" data-split="kf" aria-pressed="false">KFold · 섞음</button><button class="btn" data-split="skf" aria-pressed="true">StratifiedKFold · 섞음 (과제 조건)</button></div>
+<div class="cols"><div class="card"><h3>fold별 청구 고객 수 (전체 927명)</h3><div class="bars" id="split-bars"></div><p class="cap">세로선 = 고르게 나눴을 때 185.4명</p></div>
+<div class="card"><h3>읽는 법</h3><p id="split-cap" aria-live="polite"></p></div></div>
+<div class="say bomi"><div class="av" data-face="surprised" aria-hidden="true"><img src="assets/av_bomi_surprised.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>조교</b><p>섞지 않으면 87명에서 254명까지! 데이터가 판매점 순서로 정렬돼 있었나 봐요.</p></div></div></div></div></section><section class="part" id="folds"><div class="wrap"><div class="part-head" style="--kc:var(--data)"><div class="hex">2</div><h2>fold별 점수 5개 + 평균 ± 표준편차<span class="en">Per-fold scores</span></h2><p>과제가 요구하는 표 그대로입니다. 지표를 바꿔 보세요.</p></div><div class="body"><div class="cols"><div class="dial"><label for="f-metric">지표</label><select id="f-metric"><option value="acc" selected>Accuracy (정확도)</option><option value="prec">Precision (정밀도)</option><option value="rec">Recall (재현율)</option><option value="f1">F1</option><option value="auc">ROC-AUC</option></select></div>
+<div class="cap" style="align-self:end">점 5개 = fold 1~5, 굵은 세로 막대 = 평균, 옅은 띠 = 평균 ± 표준편차</div></div>
+<div class="canvas-box"><canvas id="fold-cv" aria-label="모델별 fold 점수 점 그림"></canvas><div class="tip" id="fold-tip" hidden></div></div>
+<div class="tblwrap"><table id="fold-table"></table></div>
+<p class="cap">표준편차는 표본 표준편차(ddof=1)입니다. SVC(RBF)는 계산량 때문에 각 fold의 학습 데이터에서 청구 비율을 유지한 채 15,000명만 뽑아 학습했습니다(새 데이터를 만든 것이 아니라 일부만 사용).</p></div></div></section><section class="part" id="trap"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">3</div><h2>Accuracy만 보고하면 왜 위험한가<span class="en">The accuracy trap</span></h2><p>과제의 서술 문항에 그대로 쓸 수 있는 근거.</p></div><div class="body"><div class="card"><h3>5-Fold 평균 (전체 63,326명)</h3><div class="tblwrap"><table><thead><tr><th>모델</th><th class="r">Accuracy</th><th class="r">Recall</th><th class="r">Precision</th><th class="r">놓친 청구 (5 fold 합)</th></tr></thead><tbody>
+<tr class="hl"><td>기준선 · 모두 “청구 없음”</td><td class="r">0.9854</td><td class="r">0.0000</td><td class="r">—</td><td class="r">927명</td></tr><tr><td>로지스틱</td><td class="r">0.7981</td><td class="r">0.7185</td><td class="r">0.0505</td><td class="r">261명</td></tr><tr><td>선형 SVM</td><td class="r">0.8127</td><td class="r">0.6980</td><td class="r">0.0529</td><td class="r">280명</td></tr><tr><td>SVC (RBF)</td><td class="r">0.7814</td><td class="r">0.7034</td><td class="r">0.0460</td><td class="r">275명</td></tr><tr><td>의사결정나무</td><td class="r">0.8082</td><td class="r">0.6612</td><td class="r">0.0494</td><td class="r">314명</td></tr><tr><td>KNN</td><td class="r">0.8390</td><td class="r">0.4983</td><td class="r">0.0453</td><td class="r">465명</td></tr></tbody></table></div></div>
+<div class="card"><h3>수치 근거</h3><ul><li>아무것도 학습하지 않은 기준선의 정확도 <b>98.54%</b>가 다섯 모델 모두보다 높습니다(모델은 78.1~83.9%).</li>
+<li>그 기준선은 청구 고객 927명을 <b>한 명도</b> 찾지 못합니다(재현율 0).</li><li>정확도 = (맞힌 수) ÷ 전체 인데 전체의 98.54%가 미청구라, 미청구만 잘 맞히면 높아집니다.</li>
+<li>그래서 정확도로 모델을 고르면 “아무것도 안 하는 모델”이 1등이 됩니다.</li></ul></div>
+<div class="say bomi"><div class="av" data-face="worried" aria-hidden="true"><img src="assets/av_bomi_worried.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>조교</b><p>박사님, 또요?</p></div></div><div class="say actuary"><div class="av" data-face="front" aria-hidden="true"><img src="assets/av_actuary_front.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>박사<span class="npc" title="NPC">NPC</span></b><p>(손바닥을 든다) …기준선부터 봅시다. 이번엔 진짜 이유가 있었죠?</p></div></div></div></div></section><section class="part" id="devices"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">4</div><h2>증강 없이 불균형을 다룬 장치<span class="en">Imbalance without augmentation</span></h2><p>과제의 마지막 요구: 무엇을, 왜 썼는지.</p></div><div class="body"><div class="tblwrap"><table><thead><tr><th>장치</th><th>설정</th><th>근거</th></tr></thead><tbody><tr><td><b>데이터 증강</b></td><td class="mono" style="font-size:.84rem"><b>쓰지 않음</b></td><td>원본 63,326행만 사용. 합성 행이 섞이면 그 행에서 나온 기준을 설명할 수 없다</td></tr><tr><td><b>클래스 가중치</b></td><td class="mono" style="font-size:.84rem">class_weight='balanced'</td><td>청구 1명을 틀린 벌점 ≈ 34.1, 미청구 1명 ≈ 0.51 (학습 fold 기준). 행은 그대로 두고 벌점만 바꾼다</td></tr><tr><td><b>임계값 조정</b></td><td class="mono" style="font-size:.84rem">KNN: 이웃 15명 중 1명 이상 청구면 위험 (1/15)</td><td>KNN 은 가중치 옵션이 없어 다수결(0.5)로는 청구를 거의 못 찾는다</td></tr><tr><td><b>층화 5-Fold</b></td><td class="mono" style="font-size:.84rem">StratifiedKFold(5, shuffle=True, random_state=42)</td><td>fold마다 청구 185~186명으로 같게 → 점수 비교가 공정</td></tr><tr><td><b>누수 방지</b></td><td class="mono" style="font-size:.84rem">Pipeline(StandardScaler → 모델)</td><td>표준화 평균·표준편차를 fold 학습 데이터로만 계산</td></tr><tr><td><b>지표</b></td><td class="mono" style="font-size:.84rem">Accuracy + Precision · Recall · F1 · ROC-AUC</td><td>정확도 하나로는 기준선을 이길 수 없다는 사실을 함께 보고</td></tr></tbody></table></div><p class="note">정리 규칙(중앙값 대체·경계값 고정)은 인슈어테크_01 2편과 같고, 노트북과 같게 전체 데이터에서 계산했습니다. 엄밀하게는 fold 학습 데이터로 계산해야 하며, 이 차이는 3편 “문제 5”에서 다룹니다.</p></div></div></section><section class="part" id="answer"><div class="wrap"><div class="part-head" style="--kc:var(--seq)"><div class="hex">5</div><h2>보고서 답안 틀<span class="en">Answer template</span></h2><p>이 편의 결과를 과제 답안 형식으로.</p></div><div class="body"><div class="answer"><span class="tt">✎ 보고서 답안 틀 (숫자는 본인 실행 결과로 바꾸세요)</span><p><b>표 1.</b> 5-Fold 교차검증 결과 (StratifiedKFold, n_splits=5, shuffle=True, random_state=42, 증강 없음)</p>
+<div class="tblwrap"><table><thead><tr><th>모델</th><th class="r">Accuracy</th><th class="r">Precision</th><th class="r">Recall</th><th class="r">F1</th><th class="r">ROC-AUC</th></tr></thead><tbody>
+<tr><td>로지스틱 (balanced)</td><td class="r">0.7981 ± 0.0044</td><td class="r">0.0505 ± 0.0020</td><td class="r">0.7185 ± 0.0395</td><td class="r">0.0943 ± 0.0038</td><td class="r">0.8219 ± 0.0264</td></tr>
+<tr><td>의사결정나무 (깊이 6, balanced)</td><td class="r">0.8082 ± 0.0267</td><td class="r">0.0494 ± 0.0038</td><td class="r">0.6612 ± 0.0900</td><td class="r">0.0918 ± 0.0069</td><td class="r">0.7971 ± 0.0309</td></tr>
+<tr><td>기준선 (모두 No)</td><td class="r">0.9854 ± 0.0000</td><td class="r">—</td><td class="r">0</td><td class="r">0</td><td class="r">0.5</td></tr></tbody></table></div>
+<p><b>서술 예.</b> “모두 미청구로 답하는 기준선의 정확도는 98.54%로 학습한 모델(로지스틱 79.81%)보다 높지만 청구 고객을 한 명도 찾지 못한다(재현율 0). 이 데이터는 청구 비율이 1.46%(약 1:67)이므로 정확도는 미청구 고객 판정에 지배된다. 따라서 정확도만 보고하면 쓸모없는 모델을 가장 좋은 모델로 고르게 된다. 증강 없이 불균형을 다루기 위해 class_weight='balanced'(청구 오분류 벌점 약 34배)를 쓰고, 표준화는 Pipeline 안에 넣어 fold 학습 데이터로만 계산했다.”</p>
+<p class="cap">fold별 5개 점수 표는 위 “fold별 점수” 섹션의 표를 그대로 옮기면 됩니다(지표를 바꿔 가며 확인).</p></div></div></div></section><section class="part" id="check"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">6</div><h2>확인 문제<span class="en">Check</span></h2><p>정답을 고르면 해설이 나옵니다.</p></div><div class="body"><div class="q" id="q1-1" data-ok="1" data-ex="섞지 않은 KFold 는 fold별 청구 수가 87~254명, 섞은 KFold 도 157~202명이지만, StratifiedKFold 는 185~186명으로 고릅니다."><p class="qt">Q1. 과제가 KFold 가 아니라 StratifiedKFold 를 요구하는 가장 큰 이유는?</p><div class="opts"><button data-i="0" data-why="속도는 거의 같습니다.">계산이 더 빠르기 때문</button><button data-i="1">fold마다 청구 비율을 같게 맞춰, 청구가 적은 fold 때문에 점수가 흔들리지 않게 하려고</button><button data-i="2" data-why="층화는 데이터를 늘리지 않습니다. 나누는 방식만 바꿉니다.">데이터를 늘려 주기 때문</button></div><p class="fb" aria-live="polite"></p></div><div class="q" id="q1-2" data-ok="1" data-ex="정확도 = π·TPR + (1−π)·TNR 이고 π=1.46%라 거의 TNR 과 같습니다(2편)."><p class="qt">Q2. 기준선의 5-Fold 평균 정확도(98.54%)가 모든 모델보다 높습니다. 올바른 해석은?</p><div class="opts"><button data-i="0" data-why="기준선은 청구 고객을 한 명도 찾지 못합니다(재현율 0).">기준선이 가장 좋은 모델이다</button><button data-i="1">이 데이터에서는 정확도가 미청구 고객 판정에 지배되므로, 정확도로 모델을 고르면 안 된다</button><button data-i="2" data-why="모델은 청구 고객을 50~72% 찾아냅니다. 정확도가 낮은 것은 오탐 때문입니다.">모델에 버그가 있다</button></div><p class="fb" aria-live="polite"></p></div><div class="q" id="q1-3" data-ok="1" data-ex="전체 데이터로 표준화한 뒤 나누면 검증 fold 의 평균·분산이 학습에 섞입니다. 과제 제약 3번(누수 금지)에 해당합니다."><p class="qt">Q3. 표준화(StandardScaler)를 Pipeline 안에 넣은 이유는?</p><div class="opts"><button data-i="0" data-why="그것도 장점이지만 핵심은 아닙니다.">코드가 짧아져서</button><button data-i="1">fold마다 학습 데이터로만 평균·표준편차를 계산해, 검증 fold 정보가 새어 들어가지 않게(누수 방지)</button><button data-i="2" data-why="class_weight 는 모델 설정입니다.">Pipeline 이 class_weight 를 자동으로 정해서</button></div><p class="fb" aria-live="polite"></p></div><div class="q" id="q1-4" data-ok="1" data-ex="fold 하나의 청구 고객은 185명이라 한두 명 차이로 몇 %포인트씩 움직입니다. 평균과 흔들림을 함께 씁니다."><p class="qt">Q4. 로지스틱의 fold별 재현율은 0.670~0.773 이었습니다. 보고서에 쓸 때 가장 알맞은 표현은?</p><div class="opts"><button data-i="0" data-why="가장 좋은 fold 만 고르면 과장입니다.">재현율 0.773 (가장 좋은 fold)</button><button data-i="1">재현율 0.7185 ± 0.0395 (5-Fold 평균 ± 표준편차)</button><button data-i="2" data-why="과제는 홀드아웃 1회 결과를 감점합니다.">재현율 0.72 (한 번 잰 값)</button></div><p class="fb" aria-live="polite"></p></div></div></div></section><section class="part" id="practice"><div class="wrap"><div class="part-head" style="--kc:var(--seq)"><div class="hex">7</div><h2>실무로 잇기<span class="en">From page to Colab</span></h2><p>이 페이지의 숫자를 만든 코드.</p></div><div class="body"><p>e1.py 는 함수·반복문·들여쓰기 없이 <span class="mono">cross_validate</span> 로 모델 2개의 fold 점수 표를 만듭니다. f1.py 는 모델 5개와 기준선, 그리고 2·3편이 쓸 검증 예측(oof_predictions.csv)까지 만듭니다. 데이터는 이 저장소의 <span class="mono">data/travel_insurance.csv</span> 를 먼저 읽습니다.</p><div class="codebox"><div class="tabs" role="tablist"><button role="tab" data-src="src-e1" data-info="초보용 · 다이얼: TREE_DEPTH">e1.py</button><button role="tab" data-src="src-f1" data-info="정식 코드 · common.py 필요 · 약 2~3분">f1.py</button><button role="tab" data-src="src-common" data-info="공통 코드">common.py</button></div><div class="tools"><span></span><button class="btn small" data-act="copy">복사</button><button class="btn small" data-act="py">.py 받기</button><button class="btn small" data-act="nb">.ipynb 받기</button></div><pre><code></code></pre></div><script type="text/plain" id="src-e1" data-file="e1.py" data-formal="0">
+# AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 · 1편 초보용 코드 (e1.py)
+# 글 · 안상선 ((주)M-Robo 대표) · CC BY-NC 4.0
+# 규칙: def · for · lambda · 들여쓰기 없음. 맨 위 [다이얼] 몇 줄만 바꿔 다시 실행하세요.
+
+# [다이얼] 비교할 나무 깊이
+TREE_DEPTH = 6
+
+# 데이터: 이 저장소에 복사해 둔 원본 (원 출처 fintech-data/Revolution 의 travel insurance.csv 와 같은 파일)
+DATA_URL = 'https://raw.githubusercontent.com/adminmrobo/ai-biz-insurtech-02/main/data/travel_insurance.csv'
+# 저장소 주소가 열리지 않으면 아래 줄의 # 를 지우고 원 출처에서 읽으세요
+# DATA_URL = 'https://raw.githubusercontent.com/fintech-data/Revolution/main/data/travel%20insurance.csv'
+
+import pandas as pd
+import numpy as np
+pd.set_option("display.width", 200)
+pd.set_option("display.max_columns", 20)
+
+# ① 데이터 읽기 + 정리 규칙 (인슈어테크_01 2편과 같음 · 행 삭제 없음 · 증강 없음)
+raw = pd.read_csv(DATA_URL)
+raw = raw.rename(columns={'Agency Type': 'Agency_Type', 'Distribution Channel': 'Distribution_Channel', 'Product Name': 'Product_Name', 'Net Sales': 'Net_Sales', 'Commision (in value)': 'Commision_in_value'})
+df = raw.copy()
+df['Gender'] = df['Gender'].fillna('Unknown')
+df['Duration'] = df['Duration'].mask(df['Duration'] <= 0, df.loc[df['Duration'] > 0, 'Duration'].median()).clip(upper=731)
+df['Age'] = df['Age'].mask(df['Age'] > 100, df.loc[df['Age'] <= 100, 'Age'].median())
+df['Net_Sales'] = df['Net_Sales'].clip(df['Net_Sales'].quantile(0.001), df['Net_Sales'].quantile(0.999))
+df['Commision_in_value'] = df['Commision_in_value'].clip(upper=df['Commision_in_value'].quantile(0.999))
+top10 = df['Destination'].value_counts().index[:10]
+df['Destination'] = df['Destination'].where(df['Destination'].isin(top10), 'OTHER')
+y = (df['Claim'] == 'Yes').astype(int)
+X = pd.get_dummies(df.drop(columns='Claim'), drop_first=True, dtype=int)
+
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import StratifiedKFold, cross_validate
+
+# ② 5-Fold: 청구 비율을 fold 마다 같게 (층화), 섞기 고정
+cv5 = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+scoring = ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']
+
+# ③ 모델 2개: 표준화는 Pipeline 안에 넣어 fold 학습 데이터로만 fit (누수 방지), 불균형은 class_weight
+logistic = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight='balanced', random_state=42))
+tree = DecisionTreeClassifier(max_depth=TREE_DEPTH, class_weight='balanced', random_state=42)
+r_lr = cross_validate(logistic, X, y, cv=cv5, scoring=scoring)
+r_dt = cross_validate(tree, X, y, cv=cv5, scoring=scoring)
+
+# ④ fold 별 점수 5개 + 평균 ± 표준편차 (표준편차는 ddof=1)
+table = pd.DataFrame({'Logistic accuracy': r_lr['test_accuracy'], 'Logistic recall': r_lr['test_recall'], 'Logistic roc_auc': r_lr['test_roc_auc'], 'Tree accuracy': r_dt['test_accuracy'], 'Tree recall': r_dt['test_recall'], 'Tree roc_auc': r_dt['test_roc_auc']}, index=['fold1', 'fold2', 'fold3', 'fold4', 'fold5'])
+table.loc['mean'] = table.iloc[:5].mean()
+table.loc['std'] = table.iloc[:5].std(ddof=1)
+print(table.round(4))
+
+# ⑤ 기준선: 모두 '청구 없음'이라고 답해도 정확도는 이만큼 나온다
+print('Baseline accuracy (all No):', round((y == 0).mean(), 4), '| Baseline recall: 0.0')
+</script><script type="text/plain" id="src-f1" data-file="f1.py" data-formal="1">
+"""
+AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 · 1편 정식 코드 (f1.py)
+글 · 안상선 ((주)M-Robo 대표) · CC BY-NC 4.0
+
+과제 문항 1: 데이터 증강 없이 5-Fold 교차검증 기준 성능 산출
+ ① 전체 63,326건을 StratifiedKFold(n_splits=5, shuffle=True, random_state=42) 로 나눈다
+ ② 모델 5개를 fold 마다 다시 학습한다 (표준화는 Pipeline 안 = fold 학습 데이터로만 fit)
+    - 불균형: 증강 없이 class_weight='balanced' (KNN 은 임계값 1/15)
+ ③ fold 별 Accuracy · Precision · Recall · F1 · ROC-AUC 와 평균 ± 표준편차, 기준선을 출력한다
+ ④ 모든 fold 의 검증 예측(OOF)을 oof_predictions.csv 로 저장한다 (2·3편에서 사용)
+"""
+import os
+import numpy as np
+import pandas as pd
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC, LinearSVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+import common
+
+PATH = os.environ.get('TI_DATA')   # 비우면 저장소 data/travel_insurance.csv 부터 읽는다
+raw = common.load_raw(PATH)
+df, info = common.clean(raw)
+X, y = common.encode(df)
+X, y = X.to_numpy(dtype=float), y.to_numpy()
+
+MODELS = {
+    'KNN': lambda: make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=15)),
+    'SVC (RBF)': lambda: make_pipeline(StandardScaler(), SVC(kernel='rbf', class_weight='balanced', random_state=42)),
+    'Linear SVM': lambda: make_pipeline(StandardScaler(), LinearSVC(C=0.1, max_iter=5000, class_weight='balanced', random_state=42)),
+    'Logistic': lambda: make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight='balanced', random_state=42)),
+    'Decision Tree': lambda: DecisionTreeClassifier(max_depth=6, class_weight='balanced', random_state=42),
+}
+
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+rows, oof = [], {m: np.zeros(len(y)) for m in MODELS}
+oof_score = {m: np.zeros(len(y)) for m in MODELS}
+for k, (tr, va) in enumerate(skf.split(X, y), 1):
+    # 기준선: 모두 '청구 없음'
+    rows.append({'model': 'Baseline (all No)', 'fold': k, 'accuracy': (y[va] == 0).mean(), 'precision': 0.0, 'recall': 0.0, 'f1': 0.0, 'roc_auc': 0.5})
+    for name, make in MODELS.items():
+        m = make()
+        Xtr, ytr = X[tr], y[tr]
+        if name == 'SVC (RBF)':   # 계산량 때문에 fold 학습 데이터에서 15,000건 층화 추출 (새 데이터 생성 아님)
+            Xtr, _, ytr, _ = train_test_split(Xtr, ytr, train_size=15000, stratify=ytr, random_state=42)
+        m.fit(Xtr, ytr)
+        if hasattr(m, 'predict_proba') and name != 'SVC (RBF)':
+            s = m.predict_proba(X[va])[:, 1]
+        else:
+            s = m.decision_function(X[va])
+        p = (s >= 1 / 15).astype(int) if name == 'KNN' else m.predict(X[va])
+        oof[name][va], oof_score[name][va] = p, s
+        rows.append({'model': name, 'fold': k, 'accuracy': accuracy_score(y[va], p), 'precision': precision_score(y[va], p),
+                     'recall': recall_score(y[va], p), 'f1': f1_score(y[va], p), 'roc_auc': roc_auc_score(y[va], s)})
+res = pd.DataFrame(rows)
+print('claims per fold:', [int(y[va].sum()) for _, va in skf.split(X, y)])
+for metric in ['accuracy', 'recall', 'precision', 'f1', 'roc_auc']:
+    t = res.pivot(index='model', columns='fold', values=metric)
+    t['mean'], t['std'] = t.mean(axis=1), t.std(axis=1, ddof=1)
+    print(f'\n[{metric}] fold 1~5, mean, std')
+    print(t.round(4).to_string())
+out = pd.DataFrame({'y': y, **{f'pred_{m}': oof[m].astype(int) for m in MODELS}, **{f'score_{m}': oof_score[m] for m in MODELS}})
+out.to_csv('oof_predictions.csv', index=False)
+print('\nsaved oof_predictions.csv', out.shape)
+</script><script type="text/plain" id="src-common" data-file="common.py" data-formal="0">
+"""
+AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 · 공통 코드 (common.py)
+글 · 안상선 ((주)M-Robo 대표) · CC BY-NC 4.0
+
+하는 일
+ ① 여행자보험 데이터 읽기 (공개 학습용 데이터, 63,326건)
+    - 이 저장소의 data/travel_insurance.csv 를 먼저 읽고, 없으면 저장소 주소 → 원 출처 주소 순으로 읽는다
+ ② 결측값 · 이상치를 업무 기준으로 고치기 (2편)
+ ③ 범주형 원-핫 인코딩, 종속변수 Claim -> 0/1
+ ④ 미리 정한 학습/시험 나누기 (층화 80:20, random_state=42 -> data/split.csv 와 같음)
+ ⑤ 기준선: "모두 청구 없음"으로만 답하기
+
+원칙: 데이터 증강(SMOTE 등 합성 데이터 생성)은 쓰지 않는다. 원본 행만 쓴다.
+"""
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+# 원 출처: https://raw.githubusercontent.com/fintech-data/Revolution/main/data/travel%20insurance.csv
+# 이 저장소에는 같은 파일을 data/travel_insurance.csv 로 복사해 두었다 (내용 동일, 파일 이름의 공백만 밑줄로)
+DATA_URL = "https://raw.githubusercontent.com/adminmrobo/ai-biz-insurtech-02/main/data/travel_insurance.csv"
+SOURCE_URL = "https://raw.githubusercontent.com/fintech-data/Revolution/main/data/travel%20insurance.csv"
+LOCAL_PATHS = ['data/travel_insurance.csv', '../data/travel_insurance.csv', 'travel_insurance.csv']
+SEED = 42
+
+RENAME = {'Agency Type': 'Agency_Type', 'Distribution Channel': 'Distribution_Channel',
+          'Product Name': 'Product_Name', 'Net Sales': 'Net_Sales',
+          'Commision (in value)': 'Commision_in_value'}
+NUM_COLS = ['Duration', 'Net_Sales', 'Commision_in_value', 'Age']
+CAT_COLS = ['Agency', 'Agency_Type', 'Distribution_Channel', 'Product_Name', 'Destination', 'Gender']
+
+
+def load_raw(path=None):
+    """① 원본 데이터 읽기 (열 이름의 공백·괄호를 밑줄로).
+    path 를 주지 않으면: 저장소 안 파일 → 저장소 주소 → 원 출처 주소 순서로 시도한다."""
+    import os
+    candidates = [path] if path else [p for p in LOCAL_PATHS if os.path.exists(p)] + [DATA_URL, SOURCE_URL]
+    last = None
+    for c in candidates:
+        try:
+            return pd.read_csv(c).rename(columns=RENAME)
+        except Exception as e:  # 주소가 아직 없거나 네트워크 오류면 다음 후보로
+            last = e
+    raise last
+
+
+def clean(df):
+    """② 결측값 · 이상치를 업무 기준으로 고친다. 행은 하나도 지우지 않는다.
+
+    - Gender 결측(약 71%) -> 'Unknown' 범주
+    - Duration 0 이하 -> 정상값(>0)의 중앙값, 731일(2년) 초과 -> 731
+    - Age 100 초과(118세 984건 등) -> 정상 나이(<=100)의 중앙값
+    - Net_Sales 상·하위 0.1%, Commision 상위 0.1% -> 경계값으로 고정(윈저라이징)
+    - Destination 149개국 -> 상위 10개국 + OTHER
+    """
+    df = df.copy()
+    df['Gender'] = df['Gender'].fillna('Unknown').replace('None', 'Unknown')
+    dur_med = df.loc[df['Duration'] > 0, 'Duration'].median()
+    df['Duration'] = df['Duration'].mask(df['Duration'] <= 0, dur_med).clip(upper=731)
+    age_med = df.loc[df['Age'] <= 100, 'Age'].median()
+    df['Age'] = df['Age'].mask(df['Age'] > 100, age_med)
+    lo, hi = df['Net_Sales'].quantile(0.001), df['Net_Sales'].quantile(0.999)
+    df['Net_Sales'] = df['Net_Sales'].clip(lo, hi)
+    c_hi = df['Commision_in_value'].quantile(0.999)
+    df['Commision_in_value'] = df['Commision_in_value'].clip(upper=c_hi)
+    top10 = df['Destination'].value_counts().index[:10]
+    df['Destination'] = df['Destination'].where(df['Destination'].isin(top10), 'OTHER')
+    info = {'duration_median': dur_med, 'age_median': age_med, 'net_low': lo, 'net_high': hi,
+            'comm_high': c_hi, 'top10_destinations': list(top10)}
+    return df, info
+
+
+def encode(df):
+    """③ X(원-핫) 와 y(청구=1) 만들기."""
+    y = (df['Claim'] == 'Yes').astype(int)
+    X = pd.get_dummies(df.drop(columns='Claim'), drop_first=True, dtype=int)
+    return X, y
+
+
+def split_index(y):
+    """④ 미리 정한 나누기: 행 번호 기준 층화 80:20 (data/split.csv 와 같은 결과)."""
+    idx = np.arange(len(y))
+    tr, te = train_test_split(idx, test_size=0.2, stratify=y, random_state=SEED)
+    return tr, te   # 순서도 노트북의 train_test_split 결과와 같게 유지
+
+
+def load_all(path=None):
+    """①~④ 한 번에: 정리된 df, X, y, 학습/시험 행 번호, 처리 정보."""
+    raw = load_raw(path)
+    df, info = clean(raw)
+    X, y = encode(df)
+    tr, te = split_index(y)
+    return raw, df, X, y, tr, te, info
+
+
+def baseline(y_true):
+    """⑤ 기준선: 모두 '청구 없음'으로 답할 때의 정확도와 재현율."""
+    acc = float((y_true == 0).mean())
+    return {'accuracy': acc, 'recall': 0.0}
+</script>
+<details class="run"><summary>실행 결과 보기 (정식 코드 f1.py 를 실제로 실행한 출력)</summary><pre>claims per fold: [186, 185, 185, 185, 186]
+
+[accuracy] fold 1~5, mean, std
+fold                    1       2       3       4       5    mean     std
+model                                                                    
+Baseline (all No)  0.9853  0.9854  0.9854  0.9854  0.9853  0.9854  0.0000
+Decision Tree      0.8209  0.7632  0.8334  0.8108  0.8127  0.8082  0.0267
+KNN                0.8414  0.8395  0.8339  0.8403  0.8399  0.8390  0.0029
+Linear SVM         0.8076  0.8059  0.8180  0.8161  0.8161  0.8127  0.0056
+Logistic           0.7954  0.7926  0.7973  0.8021  0.8029  0.7981  0.0044
+SVC (RBF)          0.7864  0.7375  0.8005  0.7776  0.8051  0.7814  0.0269
+
+[recall] fold 1~5, mean, std
+fold                    1       2       3       4       5    mean     std
+model                                                                    
+Baseline (all No)  0.0000  0.0000  0.0000  0.0000  0.0000  0.0000  0.0000
+Decision Tree      0.6935  0.7730  0.5243  0.6649  0.6505  0.6612  0.0900
+KNN                0.5323  0.4703  0.4919  0.4703  0.5269  0.4983  0.0299
+Linear SVM         0.7151  0.7730  0.6270  0.7027  0.6720  0.6980  0.0540
+Logistic           0.7366  0.7730  0.6703  0.7189  0.6935  0.7185  0.0395
+SVC (RBF)          0.6882  0.8054  0.6378  0.7081  0.6774  0.7034  0.0625
+
+[precision] fold 1~5, mean, std
+fold                    1       2       3       4       5    mean     std
+model                                                                    
+Baseline (all No)  0.0000  0.0000  0.0000  0.0000  0.0000  0.0000  0.0000
+Decision Tree      0.0551  0.0461  0.0458  0.0501  0.0498  0.0494  0.0038
+KNN                0.0490  0.0430  0.0433  0.0432  0.0481  0.0453  0.0029
+Linear SVM         0.0528  0.0559  0.0493  0.0541  0.0522  0.0529  0.0024
+Logistic           0.0511  0.0524  0.0471  0.0514  0.0502  0.0505  0.0020
+SVC (RBF)          0.0461  0.0433  0.0458  0.0453  0.0497  0.0460  0.0023
+
+[f1] fold 1~5, mean, std
+fold                    1       2       3       4       5    mean     std
+model                                                                    
+Baseline (all No)  0.0000  0.0000  0.0000  0.0000  0.0000  0.0000  0.0000
+Decision Tree      0.1021  0.0871  0.0842  0.0931  0.0926  0.0918  0.0069
+KNN                0.0897  0.0788  0.0796  0.0792  0.0881  0.0831  0.0054
+Linear SVM         0.0984  0.1042  0.0914  0.1004  0.0969  0.0983  0.0047
+Logistic           0.0956  0.0982  0.0881  0.0959  0.0937  0.0943  0.0038
+SVC (RBF)          0.0864  0.0823  0.0854  0.0851  0.0926  0.0864  0.0038
+
+[roc_auc] fold 1~5, mean, std
+fold                    1       2       3       4       5    mean     std
+model                                                                    
+Baseline (all No)  0.5000  0.5000  0.5000  0.5000  0.5000  0.5000  0.0000
+Decision Tree      0.8079  0.8424  0.7589  0.7848  0.7914  0.7971  0.0309
+KNN                0.6963  0.6645  0.6714  0.6635  0.6889  0.6769  0.0149
+Linear SVM         0.8402  0.8528  0.7864  0.8253  0.8033  0.8216  0.0269
+Logistic           0.8390  0.8537  0.7881  0.8247  0.8037  0.8219  0.0264
+SVC (RBF)          0.7860  0.8103  0.7683  0.8060  0.7963  0.7934  0.0169
+
+saved oof_predictions.csv (63326, 11)</pre></details></div></div></section><section class="part" id="prompt"><div class="wrap"><div class="part-head" style="--kc:var(--seq)"><div class="hex">✦</div><h2>AI와 함께 더 공부하기<span class="en">AI tutor prompt</span></h2><p>ChatGPT·Claude·Gemini 등에 그대로 붙여 넣으세요. [ ] 안만 바꾸면 됩니다.</p></div><div class="body"><div class="prompt"><pre id="prompt-1"># 역할
+당신은 보험 데이터 분석 과제를 돕는 튜터입니다. 저는 「AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전」 1편 「증강 없이 5-Fold로 성능 재기」을 따라 하며 과제 문항 1을 풀고 있습니다.
+정답을 대신 써 주지 말고, 제가 직접 실행하고 이해할 수 있게 도와 주세요.
+
+# 배경
+- 데이터: 여행자보험 63,326건 (data/travel_insurance.csv, 원 출처 fintech-data/Revolution)
+- 열: Agency · Agency Type · Distribution Channel · Product Name · Duration(보험 기간) · Destination(여행 국가) · Net Sales(순매출) · Commision (in value)(수수료) · Gender(71% 결측) · Age · Claim(Yes/No = 맞힐 대상)
+- 청구(Claim=Yes) 927건(1.46%), 약 1 : 67 의 극단적 불균형
+- 내 수준: [예: 파이썬 조금, 통계 처음]
+
+# 해 줄 일
+1. StratifiedKFold 와 일반 KFold 의 fold 별 청구 수를 비교하는 코드를 보여 주세요.
+2. 모델 [2]개를 Pipeline + cross_validate 로 평가해 fold 별 5개 점수와 평균 ± 표준편차 표를 만드는 코드를 보여 주세요.
+3. “모두 청구 없음” 기준선의 fold 별 정확도를 같이 출력해 주세요.
+4. Accuracy 만 보고하면 왜 위험한지 제 숫자로 설명하는 문장 틀을 주세요.
+
+# 반드시 지킬 것 (과제 제약)
+- 데이터 증강 금지: SMOTE · ADASYN · 오버샘플링 · 합성 데이터 · 단순 복제 모두 쓰지 않기. 불균형은 class_weight 와 임계값으로만
+- StratifiedKFold(n_splits=5, shuffle=True, random_state=42) 사용, fold 별 점수 5개 + 평균 ± 표준편차
+- 전처리(표준화 등)는 Pipeline 안에서 fold 학습 데이터로만 fit (누수 금지)
+- 임계값은 학습 데이터의 교차검증 확률로만 결정, 시험 데이터로 고르지 않기
+- Accuracy 만 보고하지 않기: Precision · Recall · F1 · ROC-AUC 함께
+- 실행하지 않은 숫자를 지어내지 말고, 내가 실행해서 채울 수 있는 빈 표로 주기
+- 내가 바꿀 줄에는 # [변경] 주석
+
+# 답변 형식
+1) 한 문단 요약  2) 단계별 설명(비유 하나)  3) Colab 코드  4) 결과 읽는 법  5) 내가 스스로 확인할 질문 2개</pre></div><div class="btns"><button class="btn small" data-copy="prompt-1">프롬프트 복사</button><button class="btn small" data-save="prompt-1" data-name="ai_prompt_1.txt">.txt 받기</button></div></div></div></section><section class="part" id="glossary"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">?</div><h2>용어 사전<span class="en">Glossary</span></h2><p>비유로 먼저, 뜻은 그다음.</p></div><div class="body"><dl class="gloss"><div><dt>교차검증</dt><dd><i>돌아가며 모의고사.</i> 데이터를 k조각으로 나눠 한 조각씩 시험지로 쓰는 평가.</dd></div><div><dt>fold</dt><dd><i>시험지 한 묶음.</i> 교차검증의 한 조각. 5-Fold 면 5개.</dd></div><div><dt>층화 (Stratified)</dt><dd><i>반마다 같은 비율로.</i> fold마다 청구 비율을 원래와 같게 맞춰 나누기.</dd></div><div><dt>홀드아웃</dt><dd><i>한 번만 보는 시험.</i> 학습/시험을 한 번 나눠 한 번 잰 결과. 운이 섞인다.</dd></div><div><dt>평균 ± 표준편차</dt><dd><i>점수와 그 흔들림.</i> fold 점수 5개의 평균과 표본 표준편차.</dd></div><div><dt>기준선</dt><dd><i>아무것도 안 했을 때.</i> 모두 “청구 없음”: 정확도 98.54%, 재현율 0.</dd></div><div><dt>Pipeline</dt><dd><i>순서가 정해진 조립 라인.</i> 전처리와 모델을 묶어 fold마다 학습 데이터로만 fit.</dd></div></dl></div></div></section><section class="part" id="author-sec"><div class="wrap"><div class="body"><a class="teach-link" href="answers.html#a1">강사·튜터라면 → 교육자용 정답 (1편): 정답 · 채점 기준 · 강의 멘트</a>
+<div class="card"><h3>글 · 안상선 ((주)M-Robo 대표)</h3><p class="cap">(주)M-Robo 대표. 금융·보험 데이터와 AI를 현장에서 쓰는 방법을, 버튼만 눌러 따라 할 수 있는 교재로 만듭니다.</p></div></div></div></section><section class="outro" id="outro"><div class="wrap"><div class="body"><h2>수고하셨습니다!</h2>
+<img class="scene" src="assets/s1.webp" alt="여행 가방을 수레 다섯 대에 나눠 담는 조교, 수레마다 호박색 가방 하나" width="1440" height="800" loading="lazy">
+<div class="chat"><div class="say actuary"><div class="av" data-face="explain" aria-hidden="true"><img src="assets/av_actuary_explain.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>박사<span class="npc" title="NPC">NPC</span></b><ul><li>5-Fold 는 섞고(shuffle) 층화(stratify)해야 fold마다 청구가 185명씩 고르다</li><li>정확도는 기준선 98.54%가 1등: 정확도만 보고하면 위험하다</li><li>증강 없이 class_weight · 임계값 · Pipeline 으로 다뤘다</li></ul></div></div><div class="say bomi"><div class="av" data-face="proud" aria-hidden="true"><img src="assets/av_bomi_proud.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>조교</b><p>이제 표에 평균 ± 표준편차를 쓰는 이유를 알겠어요.</p></div></div><div class="say fly"><div class="av" data-face="idea" aria-hidden="true"><img src="assets/av_fly_idea.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>초파리 연구원</b><p>근데 “청구자만 놓고 정확도”를 따로 내라는데요? 그건 또 뭐예요?</p></div></div></div>
+<div class="nav-eps"><span></span><a class="btn" href="index.html">처음 화면</a><a class="btn primary" href="2_conditional_accuracy.html">다음 편: 청구자만, 미청구자만 맞힌 비율 →</a></div></div></div></section><footer><div class="wrap"><p><b>증강 없이 5-Fold로 성능 재기</b> · AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전</p><p>글 · 안상선 ((주)M-Robo 대표)</p>
+<p><b>설명용 모형인 것:</b> 이 시리즈는 공개 학습용 여행자보험 데이터(63,326건, 원 출처 fintech-data/Revolution 의 travel insurance.csv 를 이 저장소 data/travel_insurance.csv 로 복사)를 그대로 씁니다. 가상 데이터를 만들거나 데이터를 증강하지 않습니다. 브라우저 실습은 교육용 구현이라 정식 코드와 숫자가 조금 다를 수 있으며, 다른 경우 그 자리에 밝힙니다. </p><p><b>주의:</b> 교육용 예시이며 보험 가입·보험료·보상에 대한 조언이 아닙니다. 실제 보험 심사와 보험료 산정은 감독 규정과 계리 기준을 따릅니다. 특정 집단에 불리한 특성(예: 성별·나이)의 사용은 금지되거나 제한될 수 있습니다.</p>
+<p><b>데이터:</b> 공개 학습용 Travel Insurance 데이터 · 저장소 사본 <a href="data/travel_insurance.csv">data/travel_insurance.csv</a> (원 출처 <a href="https://raw.githubusercontent.com/fintech-data/Revolution/main/data/travel%20insurance.csv">fintech-data/Revolution</a>) · 학습/시험 나누기 <a href="data/split.csv">data/split.csv</a> · 앞 시리즈 <a href="https://adminmrobo.github.io/ai-biz-insurtech-01/">인슈어테크_01 분류모델</a></p>
+<p><b>참고:</b> scikit-learn User Guide (Nearest Neighbors, SVM, Linear Models, Decision Trees, Model evaluation) · 플레이북 「인터랙티브 교육 HTML 시리즈 제작 플레이북 v3」</p>
+<p><a href="https://creativecommons.org/licenses/by-nc/4.0/deed.ko">CC BY-NC 4.0</a> — 출처 표기 예: “AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전, 글 · 안상선 ((주)M-Robo 대표), CC BY-NC 4.0”</p></div></footer>
+<p id="lang-note" class="note" hidden style="position:fixed;bottom:12px;left:12px;right:12px;z-index:30"></p>
+<script>const SITE="https://adminmrobo.github.io/ai-biz-insurtech-02/";
+// ---------- 공통: 테마 색 읽기 ----------
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+const REDRAW=[];function onTheme(f){REDRAW.push(f)}
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>REDRAW.forEach(f=>f()))}catch(e){}
+new MutationObserver(()=>REDRAW.forEach(f=>f())).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+// 캔버스 준비 (선명하게)
+function prep(cv,h){const r=cv.getBoundingClientRect();const w=Math.max(200,r.width||cv.parentNode.clientWidth||600);const d=window.devicePixelRatio||1;cv.width=w*d;cv.height=h*d;cv.style.height=h+'px';const c=cv.getContext('2d');c.setTransform(d,0,0,d,0,0);return {c,w,h}}
+let RZ;addEventListener('resize',()=>{clearTimeout(RZ);RZ=setTimeout(()=>REDRAW.forEach(f=>f()),150)});
+const fmtP=(x,d=1)=>(x*100).toFixed(d)+'%';
+const nf=n=>Number(n).toLocaleString('en-US');
+// ---------- 확인 문제 ----------
+document.querySelectorAll('.q').forEach(q=>{const ok=q.dataset.ok,fb=q.querySelector('.fb');q.querySelectorAll('.opts button').forEach(b=>b.addEventListener('click',()=>{
+ q.querySelectorAll('.opts button').forEach(x=>x.classList.remove('right','wrong'));
+ if(b.dataset.i===ok){b.classList.add('right');fb.innerHTML='<b>정답입니다.</b> '+q.dataset.ex}else{b.classList.add('wrong');fb.innerHTML='<b>다시 생각해 보세요.</b> '+(b.dataset.why||'')}}))});
+// ---------- 복사 · 내려받기 ----------
+function copyTxt(t,btn){const o=btn.textContent;const done=()=>{btn.textContent='복사됨';setTimeout(()=>btn.textContent=o,1300)};try{navigator.clipboard.writeText(t).then(done,()=>{btn.textContent='직접 선택해 복사하세요'})}catch(e){btn.textContent='직접 선택해 복사하세요'}}
+function saveFile(name,text,type){try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type||'text/plain'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}catch(e){}}
+function toIpynb(src,formal){const lines=src.split('\n');const cells=[];let cur=[];
+ lines.forEach(l=>{if(/^# [①-⑳]/.test(l)&&cur.join('').trim()){cells.push(cur);cur=[]}cur.push(l)});if(cur.join('').trim())cells.push(cur);
+ const mk=a=>{while(a.length&&!a[a.length-1].trim())a.pop();return {cell_type:'code',metadata:{},execution_count:null,outputs:[],source:a.map((l,i)=>i<a.length-1?l+'\n':l)}};
+ const out=cells.map(mk).filter(c=>c.source.join('').trim());
+ if(formal)out.unshift(mk(['# 공통 코드 내려받기 (Colab)','!wget -q -O common.py '+SITE+'code/common.py']));
+ return JSON.stringify({cells:out,metadata:{kernelspec:{name:'python3',display_name:'Python 3'},language_info:{name:'python'}},nbformat:4,nbformat_minor:5},null,1)}
+document.querySelectorAll('.codebox').forEach(box=>{const tabs=[...box.querySelectorAll('.tabs button')];const pre=box.querySelector('pre code');const info=box.querySelector('.tools span');
+ let curId=null;function show(b){tabs.forEach(t=>t.setAttribute('aria-selected',t===b?'true':'false'));curId=b.dataset.src;const s=document.getElementById(curId);pre.textContent=s.textContent.replace(/^\n/,'');info.textContent=b.dataset.info||''}
+ tabs.forEach(t=>t.addEventListener('click',()=>show(t)));if(tabs[0])show(tabs[0]);
+ box.querySelector('[data-act=copy]').addEventListener('click',e=>copyTxt(pre.textContent,e.currentTarget));
+ box.querySelector('[data-act=py]').addEventListener('click',()=>{const s=document.getElementById(curId);saveFile(s.dataset.file,pre.textContent,'text/x-python')});
+ box.querySelector('[data-act=nb]').addEventListener('click',()=>{const s=document.getElementById(curId);saveFile(s.dataset.file.replace(/\.py$/,'.ipynb'),toIpynb(pre.textContent,s.dataset.formal==='1'),'application/json')})});
+document.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',e=>copyTxt(document.getElementById(b.dataset.copy).textContent,e.currentTarget)));
+document.querySelectorAll('[data-save]').forEach(b=>b.addEventListener('click',()=>saveFile(b.dataset.name,document.getElementById(b.dataset.save).textContent)));
+// ---------- 상태 캐릭터 ----------
+function robo(id,st){const w=document.getElementById(id);if(!w||w.dataset.st===st)return;w.dataset.st=st;w.querySelectorAll('[data-rs]').forEach(e=>e.hidden=e.dataset.rs!==st)}
+// ---------- 식구 카드: 모습 바꾸기 ----------
+document.querySelectorAll('.crew .moods button').forEach(b=>b.addEventListener('click',()=>{const card=b.closest('.crew');
+ card.querySelectorAll('.moods button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+ card.querySelectorAll('.cf').forEach(f=>f.classList.toggle('on',f.dataset.face===b.dataset.fb))}));
+// ---------- 막대 (기준선 포함) ----------
+function setBar(el,v,base){el.querySelector('.fill').style.width=Math.max(0,Math.min(1,v))*100+'%';const bl=el.querySelector('.base');if(bl){if(base==null)bl.hidden=true;else{bl.hidden=false;bl.style.left='calc('+base*100+'% - 1px)'}}el.querySelector('.v').textContent=fmtP(v)}
+// ---------- 혼동행렬 ----------
+function cmHTML(m){return `<div></div><div class="h">판정: 청구 없음</div><div class="h">판정: 청구 위험</div>
+ <div class="h rh">실제 미청구</div><div class="c ok"><b>${nf(m.tn)}</b><span>정상 통과</span></div><div class="c"><b>${nf(m.fp)}</b><span>추가 심사 (오탐)</span></div>
+ <div class="h rh">실제 청구</div><div class="c bad"><b>${nf(m.fn)}</b><span>⚠ 놓친 청구</span></div><div class="c ok"><b>${nf(m.tp)}</b><span>찾은 청구</span></div>`}
+
+const D={"FM":{"lr":[{"acc":0.7954366019264172,"prec":0.0511384845091452,"rec":0.7365591397849462,"f1":0.09563699825479931,"auc":0.839013173766198,"tnr":0.7963141025641025,"tp":137,"fn":49,"fp":2542,"tn":9938},{"acc":0.7925779707856296,"prec":0.05241935483870968,"rec":0.772972972972973,"f1":0.09818056985925164,"auc":0.8537198977823979,"tnr":0.7928685897435898,"tp":143,"fn":42,"fp":2585,"tn":9895},{"acc":0.7973154362416107,"prec":0.04714828897338403,"rec":0.6702702702702703,"f1":0.0880994671403197,"auc":0.7881314968814969,"tnr":0.799198717948718,"tp":124,"fn":61,"fp":2506,"tn":9974},{"acc":0.8020529016975918,"prec":0.051391035548686244,"rec":0.7189189189189189,"f1":0.09592499098449332,"auc":0.8247438063063064,"tnr":0.8032852564102564,"tp":133,"fn":52,"fp":2455,"tn":10025},{"acc":0.8029214370311883,"prec":0.05023364485981308,"rec":0.6935483870967742,"f1":0.09368191721132899,"auc":0.8037220810531587,"tnr":0.8045516467665679,"tp":129,"fn":57,"fp":2439,"tn":10040}],"lsvm":[{"acc":0.8075951365861361,"prec":0.052840683353198255,"rec":0.7150537634408602,"f1":0.09840917499075102,"auc":0.8401970033774468,"tnr":0.808974358974359,"tp":133,"fn":53,"fp":2384,"tn":10096},{"acc":0.8059218318199763,"prec":0.055881203595154354,"rec":0.772972972972973,"f1":0.1042274052478134,"auc":0.8527891112266112,"tnr":0.8064102564102564,"tp":143,"fn":42,"fp":2416,"tn":10064},{"acc":0.818002368732728,"prec":0.04931972789115646,"rec":0.6270270270270271,"f1":0.09144659046117462,"auc":0.7864163201663201,"tnr":0.8208333333333333,"tp":116,"fn":69,"fp":2236,"tn":10244},{"acc":0.8161073825503355,"prec":0.054076539101497505,"rec":0.7027027027027027,"f1":0.10042487446890692,"auc":0.8252661555786556,"tnr":0.8177884615384615,"tp":130,"fn":55,"fp":2274,"tn":10206},{"acc":0.8161073825503355,"prec":0.05223568742164647,"rec":0.6720430107526881,"f1":0.09693679720822024,"auc":0.8033050363320056,"tnr":0.8182546678419745,"tp":125,"fn":61,"fp":2268,"tn":10211}],"svc":[{"acc":0.7863571766935101,"prec":0.04610951008645533,"rec":0.6881720430107527,"f1":0.08642808912896689,"auc":0.7859540856768679,"tnr":0.7878205128205128,"tp":128,"fn":58,"fp":2648,"tn":9832},{"acc":0.7374654559810502,"prec":0.0433391506689936,"rec":0.8054054054054054,"f1":0.08225227711841016,"auc":0.8103380544005543,"tnr":0.7364583333333333,"tp":149,"fn":36,"fp":3289,"tn":9191},{"acc":0.8004737465455981,"prec":0.045771916214119475,"rec":0.6378378378378379,"f1":0.08541440463264569,"auc":0.7682610013860014,"tnr":0.8028846153846154,"tp":118,"fn":67,"fp":2460,"tn":10020},{"acc":0.7775759968416897,"prec":0.045266067726330336,"rec":0.7081081081081081,"f1":0.08509256252029879,"auc":0.806017195079695,"tnr":0.7786057692307692,"tp":131,"fn":54,"fp":2763,"tn":9717},{"acc":0.8051322542439795,"prec":0.049723756906077346,"rec":0.6774193548387096,"f1":0.09264705882352942,"auc":0.7963277230478386,"tnr":0.8070358201778989,"tp":126,"fn":60,"fp":2408,"tn":10071}],"dt":[{"acc":0.8208589925785568,"prec":0.055104656129859035,"rec":0.6935483870967742,"f1":0.10209734863474476,"auc":0.8078585952577888,"tnr":0.8227564102564102,"tp":129,"fn":57,"fp":2212,"tn":10268},{"acc":0.7632056849585471,"prec":0.046129032258064515,"rec":0.772972972972973,"f1":0.08706240487062405,"auc":0.8424415280665282,"tnr":0.7630608974358974,"tp":143,"fn":42,"fp":2957,"tn":9523},{"acc":0.8333991314646664,"prec":0.045776309579990564,"rec":0.5243243243243243,"f1":0.0842013888888889,"auc":0.7589418745668747,"tnr":0.8379807692307693,"tp":97,"fn":88,"fp":2022,"tn":10458},{"acc":0.8108172127911567,"prec":0.050061050061050064,"rec":0.6648648648648648,"f1":0.09311127933383799,"auc":0.7847565835065835,"tnr":0.8129807692307692,"tp":123,"fn":62,"fp":2334,"tn":10146},{"acc":0.8127121989735492,"prec":0.04983525535420099,"rec":0.6505376344086021,"f1":0.09257842387146137,"auc":0.7914401570983337,"tnr":0.8151294174212678,"tp":121,"fn":65,"fp":2307,"tn":10172}],"knn":[{"acc":0.841386388757303,"prec":0.048985650667986144,"rec":0.532258064516129,"f1":0.08971454463072044,"auc":0.6963179797353184,"tnr":0.8459935897435897,"tp":99,"fn":87,"fp":1922,"tn":10558},{"acc":0.8394788787998421,"prec":0.04302670623145401,"rec":0.4702702702702703,"f1":0.07884005437245128,"auc":0.6645242117117118,"tnr":0.8449519230769231,"tp":87,"fn":98,"fp":1935,"tn":10545},{"acc":0.8338728780102646,"prec":0.043312708234174206,"rec":0.4918918918918919,"f1":0.07961504811898514,"auc":0.6714438236313237,"tnr":0.8389423076923077,"tp":91,"fn":94,"fp":2010,"tn":10470},{"acc":0.8402684563758389,"prec":0.04324055666003976,"rec":0.4702702702702703,"f1":0.07919890760127446,"auc":0.6635122141372142,"tnr":0.8457532051282052,"tp":87,"fn":98,"fp":1925,"tn":10555},{"acc":0.8398736675878405,"prec":0.04808635917566242,"rec":0.5268817204301075,"f1":0.0881294964028777,"auc":0.6888839917728451,"tnr":0.8445388252263804,"tp":98,"fn":88,"fp":1940,"tn":10539}],"base":[{"acc":0.98531501657982,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":186,"fp":0,"tn":12480},{"acc":0.9853928148440584,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":185,"fp":0,"tn":12480},{"acc":0.9853928148440584,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":185,"fp":0,"tn":12480},{"acc":0.9853928148440584,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":185,"fp":0,"tn":12480},{"acc":0.9853138570864588,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":186,"fp":0,"tn":12479}]},"models":[["lr","로지스틱"],["lsvm","선형 SVM"],["svc","SVC (RBF)"],["dt","의사결정나무"],["knn","KNN"]],"split":{"skf":[186,185,185,185,186],"kf":[180,192,157,202,196],"noshuf":[87,122,227,237,254]}};
+const SCAP={noshuf:'원본 파일 순서 그대로 다섯 조각으로 자르면 fold마다 청구 고객이 <b>87명 ~ 254명</b>으로 세 배 가까이 차이 납니다. 데이터가 어떤 기준(판매점 등)으로 정렬돼 있기 때문입니다. 이런 fold로 잰 점수는 모델 차이가 아니라 나누기 차이를 봅니다.',
+ kf:'섞으면 나아지지만 여전히 <b>157명 ~ 202명</b>으로 흔들립니다. 청구가 드물수록 우연의 차이가 큽니다.',
+ skf:'층화하면 fold마다 <b>185~186명</b>으로 같아집니다. 과제가 StratifiedKFold(n_splits=5, shuffle=True, random_state=42)를 요구하는 이유입니다.'};
+function showSplit(k){document.querySelectorAll('[data-split]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.split===k));
+ const v=D.split[k],mx=260;document.getElementById('split-bars').innerHTML=v.map((c,i)=>`<div class="bar" style="--c:var(--c-claim)"><span>fold ${i+1}</span><div class="track"><div class="fill" style="width:${c/mx*100}%"></div><div class="base" style="left:calc(${185.4/mx*100}% - 1px)"></div></div><span class="v">${c}명</span></div>`).join('');
+ document.getElementById('split-cap').innerHTML=SCAP[k]}
+document.querySelectorAll('[data-split]').forEach(b=>b.addEventListener('click',()=>showSplit(b.dataset.split)));showSplit('skf');
+const NAMES=Object.fromEntries(D.models);const MK=[['base','기준선 (모두 No)'],...D.models];
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length,sd=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1))};
+function drawFolds(){const met=document.getElementById('f-metric').value;const cv=document.getElementById('fold-cv');const {c,w,h}=prep(cv,40+MK.length*42);
+ const L=118,R=20,T=24,B=10;const vals=MK.map(([k])=>D.FM[k].map(r=>r[met]));const all=vals.flat();let lo=Math.min(...all),hi=Math.max(...all);const pad=(hi-lo)*0.08||0.02;lo=Math.max(0,lo-pad);hi=Math.min(1,hi+pad);
+ const X=v=>L+(v-lo)/(hi-lo)*(w-L-R);c.fillStyle=cssv('--surface');c.fillRect(0,0,w,h);c.font='11px '+cssv('--f-body');
+ const step=(hi-lo)>0.5?0.1:(hi-lo)>0.2?0.05:(hi-lo)>0.08?0.02:0.01;c.strokeStyle=cssv('--grid');c.fillStyle=cssv('--muted');c.textAlign='center';
+ for(let v=Math.ceil(lo/step)*step;v<=hi+1e-9;v+=step){c.beginPath();c.moveTo(X(v),T-4);c.lineTo(X(v),h-B);c.stroke();c.fillText(v.toFixed(step<0.05?2:2),X(v),T-10)}
+ window._fp=[];MK.forEach(([k,n],i)=>{const y=T+18+i*42,v=vals[i],m=mean(v),s=sd(v);c.fillStyle=cssv('--ink');c.textAlign='right';c.font=(k==='base'?'600 ':'')+'12px '+cssv('--f-body');c.fillText(n,L-10,y+4);
+  c.fillStyle=cssv('--accent-soft');c.fillRect(X(Math.max(lo,m-s)),y-11,Math.max(2,X(Math.min(hi,m+s))-X(Math.max(lo,m-s))),22);
+  c.fillStyle=cssv('--ink');c.fillRect(X(m)-1.5,y-13,3,26);
+  v.forEach((x,j)=>{c.beginPath();c.fillStyle=k==='base'?cssv('--muted'):cssv('--c-3');c.strokeStyle=cssv('--surface');c.lineWidth=2;c.arc(X(x),y,5,0,7);c.fill();c.stroke();_fp.push([X(x),y,n,j+1,x])});c.lineWidth=1});
+ const tip=document.getElementById('fold-tip');cv.onmousemove=ev=>{const r=cv.getBoundingClientRect(),mx=ev.clientX-r.left,my=ev.clientY-r.top;let b=null,bd=150;_fp.forEach(p=>{const d=(p[0]-mx)**2+(p[1]-my)**2;if(d<bd){bd=d;b=p}});if(!b){tip.hidden=true;return}tip.hidden=false;tip.style.left=b[0]+'px';tip.style.top=b[1]+'px';tip.textContent=b[2]+' · fold '+b[3]+' · '+b[4].toFixed(4)};cv.onmouseleave=()=>tip.hidden=true;
+ document.getElementById('fold-table').innerHTML='<thead><tr><th>모델</th><th class="r">fold 1</th><th class="r">fold 2</th><th class="r">fold 3</th><th class="r">fold 4</th><th class="r">fold 5</th><th class="r">평균</th><th class="r">표준편차</th></tr></thead><tbody>'+MK.map(([k,n],i)=>`<tr${k==='base'?' class="hl"':''}><td>${n}</td>${vals[i].map(x=>`<td class="r">${x.toFixed(4)}</td>`).join('')}<td class="r"><b>${mean(vals[i]).toFixed(4)}</b></td><td class="r">${sd(vals[i]).toFixed(4)}</td></tr>`).join('')+'</tbody>'}
+document.getElementById('f-metric').addEventListener('change',drawFolds);drawFolds();onTheme(drawFolds);
+</script>
+</body>
+</html>

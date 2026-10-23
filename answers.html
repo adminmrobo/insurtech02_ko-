@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<script>
+(function(){var KEY='it2_lang',AVAILABLE=['ko'],LANGS=['ko','en','zh','ja','uz','ru'];
+var cur=document.documentElement.lang||'ko';cur=cur.slice(0,2);
+function root(){var p=location.pathname;var dir=p.replace(/[^\/]*$/,'');if(cur!=='ko'){dir=dir.replace(/[^\/]+\/$/,'')}return dir}
+function file(){var f=location.pathname.split('/').pop();if(!f)f='index.html';if(!/\.html?$/.test(f))f+='.html';return f}
+function url(l){return root()+(l==='ko'?'':l+'/')+file()+location.search.replace(/[?&]lang=[^&]*/,'').replace(/^&/,'?')+location.hash}
+function exists(u,cb){if(location.protocol==='file:'){cb(true);return}try{fetch(u,{method:'HEAD'}).then(function(r){cb(!(r.status===404||r.status===410))},function(){cb(true)})}catch(e){cb(true)}}
+function save(l){try{localStorage.setItem(KEY,l)}catch(e){}}
+function drop(){try{localStorage.removeItem(KEY)}catch(e){}}
+window.itSetLang=function(l,manual){if(l===cur)return;
+ if(AVAILABLE.indexOf(l)<0){if(manual){var n=document.getElementById('lang-note');if(n){n.hidden=false;n.textContent='이 언어판은 아직 준비 중입니다 ('+l+'). 한국어판을 보여 드립니다.'}}else{drop()}return}
+ var u=url(l);exists(u,function(ok){if(ok){if(manual)save(l);location.href=u}else{drop();if(manual){var n=document.getElementById('lang-note');if(n){n.hidden=false;n.textContent='언어판 파일을 찾지 못했습니다: '+u}}}})};
+var q=(location.search.match(/[?&]lang=([a-z]{2})/)||[])[1];
+if(q&&LANGS.indexOf(q)>=0){save(q);if(q!==cur)itSetLang(q,true);return}
+var s=null;try{s=localStorage.getItem(KEY)}catch(e){}
+if(s&&s!==cur){itSetLang(s,false);return}
+if(!s){var b=(navigator.language||'ko').slice(0,2);if(b!==cur&&AVAILABLE.indexOf(b)>=0)itSetLang(b,false)}
+})();
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>교육자용 정답 | 인슈어테크 #2 실전</title>
+<meta name="description" content="AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 다섯 편의 확인 문제 정답 · 채점 기준 · 강의 멘트.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Silkscreen&display=swap">
+<style>
+
+.say .av:has(img){background:#fff}
+.say .av img{display:block}
+img.scene{display:block;width:100%;max-width:720px;height:auto;aspect-ratio:9/5;object-fit:cover;border-radius:var(--r)}
+img.keyvis{display:block;width:100%;height:auto;aspect-ratio:1100/320;object-fit:cover;border-radius:var(--r)}
+img.pic{display:block;width:100%;height:auto;aspect-ratio:480/440;object-fit:cover;border-radius:6px}
+.crew .cf{background:#fff}
+.crew .cf img{width:100%;height:100%;object-fit:contain}
+.crew .moods button img{width:36px;height:36px;border-radius:7px;display:block}
+/* 레이아웃: 보상 센터 연구 노트 — 상단 바 · 히어로(그림 자리) · 육각 번호 섹션 · 카드형 실습 */
+:root{
+  --bg:#f6f5fb; --surface:#ffffff; --sunken:#eeecf7; --ink:#1d1a2e; --muted:#5d5873; --line:#dcd8ea;
+  --accent:#5b47c9; --accent-ink:#ffffff; --accent-soft:#ece8ff;
+  --core:#6a4fd8; --data:#c2417a; --seq:#13857f;
+  --c-no:#2f86c9; --c-claim:#d9730d; --c-3:#7b61d9; --c-4:#1f9e78;
+  --risk:#b4471b; --risk-bg:#fdeee6; --safe:#1f7a5c; --safe-bg:#e5f4ee; --warn:#9a620e; --warn-bg:#fbf1df;
+  --grid:#e6e3f0;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --f-pixel:"Silkscreen","IBM Plex Mono",monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12111a; --surface:#1b1a26; --sunken:#0e0d15; --ink:#ece9f7; --muted:#a29dba; --line:#2e2b40;
+  --accent:#a998ff; --accent-ink:#14121f; --accent-soft:#2a2547;
+  --core:#a48cf0; --data:#f07aaa; --seq:#4cc3b9;
+  --c-no:#3f8fd2; --c-claim:#d8742a; --c-3:#8a74e0; --c-4:#26a17c;
+  --risk:#f08a5d; --risk-bg:#3a1f16; --safe:#5fcf9f; --safe-bg:#14302a; --warn:#e3aa52; --warn-bg:#33270f;
+  --grid:#2a2738; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12111a; --surface:#1b1a26; --sunken:#0e0d15; --ink:#ece9f7; --muted:#a29dba; --line:#2e2b40;
+  --accent:#a998ff; --accent-ink:#14121f; --accent-soft:#2a2547;
+  --core:#a48cf0; --data:#f07aaa; --seq:#4cc3b9;
+  --c-no:#3f8fd2; --c-claim:#d8742a; --c-3:#8a74e0; --c-4:#26a17c;
+  --risk:#f08a5d; --risk-bg:#3a1f16; --safe:#5fcf9f; --safe-bg:#14302a; --warn:#e3aa52; --warn-bg:#33270f;
+  --grid:#2a2738; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.7;word-break:keep-all;overflow-wrap:break-word}
+a{color:var(--accent)}
+h1,h2,h3{line-height:1.3;text-wrap:balance;margin:0}
+p{margin:0}
+code,pre,.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:20px}
+nav.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+nav.top .wrap{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;padding-block:8px}
+nav.top .brand{font-weight:700;text-decoration:none;color:var(--ink);white-space:nowrap}
+nav.top .brand b{font-family:var(--f-pixel);font-weight:400;color:var(--accent);margin-left:4px}
+nav.top .links{display:flex;gap:2px 12px;flex-wrap:wrap;font-size:.86rem;flex:1;min-width:0}
+nav.top .links a{color:var(--muted);text-decoration:none}
+nav.top .links a:hover{color:var(--ink)}
+nav.top select{width:auto;font:inherit;font-size:.82rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+header.hero{padding-block:28px 20px}
+.hero-grid{display:grid;gap:18px}
+.series{display:flex;flex-wrap:wrap;gap:6px}
+.series a{font-size:.78rem;text-decoration:none;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--surface)}
+.series a.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.kicker{font-family:var(--f-pixel);font-size:.82rem;color:var(--accent);letter-spacing:.04em}
+h1{font-size:clamp(1.7rem,4.2vw,2.5rem);font-weight:700;letter-spacing:-.015em}
+.lead{font-size:1.06rem;color:var(--muted);max-width:68ch}
+.byline{font-size:.84rem;color:var(--muted)}
+.guide{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted)}
+.guide span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.chat{display:grid;gap:10px;max-width:760px}
+.say{display:flex;gap:12px;align-items:flex-start}
+.say .av{flex:0 0 52px;height:52px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:1.05rem;color:var(--accent-ink);background:var(--avc,var(--accent));position:relative;overflow:hidden}
+.say .av img{width:100%;height:100%;object-fit:cover;object-position:50% 18%}
+.say .av small{position:absolute;bottom:2px;left:0;right:0;font-size:.55rem;font-weight:500;text-align:center;opacity:.85}
+.say .sbub{background:var(--surface);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:8px 14px;min-width:0}
+.say .sbub b{font-size:.8rem;color:var(--muted);display:block}
+.say .sbub ul{margin:4px 0 0;padding-left:1.2em}
+.npc{display:inline-block;margin-left:6px;font-family:var(--f-pixel);font-size:.62rem;font-weight:400;letter-spacing:.06em;color:#3a2a00;background:#f2c94c;border:1px solid #b8901a;border-radius:3px;padding:0 5px;vertical-align:1px}
+.bomi{--avc:#d9730d}.actuary{--avc:#5b47c9}.fly{--avc:#13857f}.robo{--avc:#2f86c9}
+section.part{padding-block:34px 10px;border-top:1px solid var(--line);margin-top:26px}
+.part-head{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center;margin-bottom:16px}
+.hex{width:44px;height:50px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:var(--kc,var(--accent));color:#fff;display:grid;place-items:center;font-family:var(--f-pixel);font-size:1.05rem;grid-row:span 2}
+.part-head h2{font-size:1.4rem}
+.part-head h2 span.en{font-family:var(--f-pixel);font-weight:400;font-size:.72rem;color:var(--muted);margin-left:8px;letter-spacing:.03em}
+.part-head p{color:var(--muted);font-size:.94rem}
+.body{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.body>p,.body>ul,.body>ol{max-width:72ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:grid;gap:12px;min-width:0;align-content:start}
+.card h3{font-size:1.02rem}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.76rem;color:var(--muted);font-weight:600;letter-spacing:.02em;white-space:nowrap}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+tr.hl td{background:var(--accent-soft);font-weight:600}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit}
+.btn{text-decoration:none;display:inline-block;font-size:.9rem;font-weight:600;border-radius:8px;padding:7px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn[aria-pressed="true"],.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{font-size:.8rem;padding:3px 10px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dial{display:grid;gap:4px;min-width:0;align-content:start}
+.dial label{font-size:.86rem;font-weight:500;display:flex;justify-content:space-between;gap:8px}
+.dial label output{font-family:var(--f-mono);color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select,input[type=text],input[type=number]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-width:0}
+.canvas-box{position:relative;min-width:0}
+.canvas-box canvas{width:100%;display:block;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.cap{font-size:.86rem;color:var(--muted)}
+.cap b{color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:.76rem;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-120%);z-index:5}
+.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:8px}
+.stat>div{background:var(--sunken);border-radius:6px;padding:8px 12px;display:grid}
+.stat .l{font-size:.74rem;color:var(--muted)}
+.stat .v{font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:6.5em 1fr 4.2em;gap:8px;align-items:center;font-size:.84rem}
+.bar .track{position:relative;height:16px;background:var(--sunken);border-radius:4px}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;background:var(--c,var(--accent));transition:width .25s}
+.bar .base{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.bar .v{font-family:var(--f-mono);text-align:right}
+@media (prefers-reduced-motion:reduce){.bar .fill{transition:none}}
+.cm{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;max-width:440px;font-variant-numeric:tabular-nums}
+.cm .h{font-size:.76rem;color:var(--muted);font-weight:600;display:flex;align-items:end;padding:2px 4px}
+.cm .rh{align-items:center}
+.cm .c{border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:grid;background:var(--surface)}
+.cm .c b{font-size:1.15rem}
+.cm .c span{font-size:.74rem;color:var(--muted)}
+.cm .c.ok{background:var(--safe-bg);border-color:transparent}
+.cm .c.bad{background:var(--risk-bg);border:2px solid var(--risk)}
+.cm .c.bad span{color:var(--risk);font-weight:600}
+.pill{display:inline-block;font-size:.74rem;font-weight:600;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.pill.risk{background:var(--risk-bg);color:var(--risk)}.pill.safe{background:var(--safe-bg);color:var(--safe)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.pass{background:var(--safe-bg);color:var(--safe)}.pill.fail{background:var(--risk-bg);color:var(--risk)}
+.note{border-left:3px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 6px 6px 0;font-size:.9rem}
+.note.info{border-color:var(--accent);background:var(--accent-soft)}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px;display:grid;gap:10px}
+.q .qt{font-weight:600}
+.q .opts{display:grid;gap:6px}
+.q .opts button{text-align:left;font-size:.92rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+.q .opts button.right{border-color:var(--safe);background:var(--safe-bg)}
+.q .opts button.wrong{border-color:var(--risk);background:var(--risk-bg)}
+.q .fb{font-size:.9rem}
+.codebox{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.codebox .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);background:var(--sunken);padding:6px 6px 0}
+.codebox .tabs button{border:0;background:none;padding:6px 12px;border-radius:6px 6px 0 0;cursor:pointer;color:var(--muted);font-size:.84rem;font-family:var(--f-mono)}
+.codebox .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:500}
+.codebox .tools{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);align-items:center}
+.codebox .tools span{font-size:.78rem;color:var(--muted);flex:1;min-width:12em}
+.codebox pre{margin:0;padding:14px 16px;overflow:auto;max-height:440px;font-size:.8rem;line-height:1.55;white-space:pre}
+details.run{border:1px solid var(--line);border-radius:var(--r);background:var(--sunken)}
+details.run summary{cursor:pointer;padding:8px 14px;font-size:.88rem;font-weight:500}
+details.run pre{margin:0;padding:10px 16px 14px;overflow:auto;font-size:.78rem;line-height:1.5}
+.gloss{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px}
+.gloss div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px}
+.gloss dt{font-weight:600}.gloss dd{margin:2px 0 0;font-size:.88rem;color:var(--muted)}
+.gloss dd i{font-style:normal;color:var(--ink)}
+.prompt pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunken);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;font-size:.8rem;max-height:360px;overflow:auto;margin:0}
+.teach-link{display:inline-block;font-weight:600;text-decoration:none;border:1px solid var(--accent);border-radius:8px;padding:8px 14px}
+section.outro{margin-top:40px;padding-block:30px;border-top:1px solid var(--line)}
+.outro .scene{width:100%;max-width:720px;aspect-ratio:720/400;border-radius:var(--r)}
+.placeholder{display:grid;place-items:center;text-align:center;background:repeating-linear-gradient(135deg,var(--sunken) 0 12px,var(--surface) 12px 24px);border:1px dashed var(--line);color:var(--muted);font-size:.82rem;padding:10px}
+.nav-eps{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+footer{border-top:1px solid var(--line);margin-top:30px;padding-block:22px 40px;font-size:.82rem;color:var(--muted)}
+footer .wrap{display:grid;gap:8px}
+.robo-w{align-items:center}
+.robo-w .av{flex-basis:64px;height:64px;font-size:1.4rem}
+.robo-w[data-st="wrong"] .av{--avc:var(--risk)}
+.robo-w[data-st="success"] .av{--avc:var(--safe)}
+.robo-w[data-st="confused"] .av{--avc:var(--warn)}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.player input[type=range]{flex:1;min-width:140px}
+.stamp{justify-self:start;border:3px double currentColor;border-radius:4px;padding:6px 16px;font-weight:700;font-size:1.35rem;letter-spacing:.04em;transform:rotate(-2deg)}
+.stamp.risk{color:var(--risk)}.stamp.safe{color:var(--safe)}.stamp.reject{color:var(--warn)}
+@media (max-width:560px){body{font-size:15px}.part-head h2{font-size:1.2rem}.say .av{flex-basis:44px;height:44px}}
+
+.task{border:1px solid var(--line);border-left:4px solid var(--data);background:var(--surface);border-radius:0 var(--r) var(--r) 0;padding:14px 18px;display:grid;gap:8px}
+.task .tt{font-family:var(--f-pixel);font-size:.8rem;color:var(--data)}
+.task ul{margin:0;padding-left:1.2em}
+.answer{border:2px dashed var(--accent);border-radius:var(--r);padding:14px 18px;display:grid;gap:10px;background:var(--surface)}
+.answer .tt{font-weight:700;color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{font-size:.76rem;border:1px solid var(--line);border-radius:999px;padding:1px 9px;background:var(--sunken)}
+.chips span.ban{border-color:var(--risk);color:var(--risk);background:var(--risk-bg)}
+.tagx{display:inline-block;font-size:.72rem;font-weight:600;background:var(--sunken);border-radius:4px;padding:0 6px;margin-right:4px;color:var(--muted)}</style>
+</head>
+<body>
+<nav class="top"><div class="wrap"><a class="brand" href="index.html">인슈어테크 #2 실전</a><div class="links"><a href="index.html">처음 화면</a><a href="#a1">1편</a><a href="#a2">2편</a><a href="#a3">3편</a><a href="#a4">4편</a><a href="#a5">5편</a></div><select id="lang-sel" aria-label="언어 선택" onchange="itSetLang(this.value,true)"><option value="ko" selected>한국어</option><option value="en">English</option><option value="zh">中文</option><option value="ja">日本語</option><option value="uz">O'zbekcha</option><option value="ru">Русский</option></select></div></nav><header class="hero"><div class="wrap hero-grid"><p class="kicker">ANSWER KEY FOR EDUCATORS</p><h1>교육자용 정답</h1>
+<p class="lead">AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 다섯 편의 확인 문제 정답 · 채점 기준 · 강의 가이드라인 · 섹션별 강의 멘트입니다. 과제 문항별 답안 틀은 각 편 페이지에 있습니다.</p>
+<ul><li>학습자는 먼저 각 편에서 직접 풀어 본 뒤 확인하세요.</li><li>강사는 배점과 멘트를 수업에 맞게 조정하세요. 멘트는 섹션마다 도입 · 시연 · 질문 · 정리 네 줄이며 그대로 읽어도 됩니다.</li>
+<li>숫자는 Python 3 · scikit-learn 으로 정식 코드를 실행한 결과입니다(StratifiedKFold 5, random_state=42). 버전에 따라 소수 넷째 자리가 조금 다를 수 있습니다.</li></ul></div></header><section class="part" id="a1"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">1</div><h2>증강 없이 5-Fold로 성능 재기<span class="en">해설형</span></h2><p><a href="1_kfold_cv.html#author-sec">1편 페이지의 교육자 안내로 돌아가기</a></p></div>
+<div class="body"><h3>확인 문제 (4개)</h3><div class="card"><h3>문제 1</h3><p>Q1. 과제가 KFold 가 아니라 StratifiedKFold 를 요구하는 가장 큰 이유는?</p><ol><li>계산이 더 빠르기 때문<br><span class=cap>오해: 속도는 거의 같습니다.</span></li><li><b>fold마다 청구 비율을 같게 맞춰, 청구가 적은 fold 때문에 점수가 흔들리지 않게 하려고 ✔ 정답</b></li><li>데이터를 늘려 주기 때문<br><span class=cap>오해: 층화는 데이터를 늘리지 않습니다. 나누는 방식만 바꿉니다.</span></li></ol><p><b>해설</b> 섞지 않은 KFold 는 fold별 청구 수가 87~254명, 섞은 KFold 도 157~202명이지만, StratifiedKFold 는 185~186명으로 고릅니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 2</h3><p>Q2. 기준선의 5-Fold 평균 정확도(98.54%)가 모든 모델보다 높습니다. 올바른 해석은?</p><ol><li>기준선이 가장 좋은 모델이다<br><span class=cap>오해: 기준선은 청구 고객을 한 명도 찾지 못합니다(재현율 0).</span></li><li><b>이 데이터에서는 정확도가 미청구 고객 판정에 지배되므로, 정확도로 모델을 고르면 안 된다 ✔ 정답</b></li><li>모델에 버그가 있다<br><span class=cap>오해: 모델은 청구 고객을 50~72% 찾아냅니다. 정확도가 낮은 것은 오탐 때문입니다.</span></li></ol><p><b>해설</b> 정확도 = π·TPR + (1−π)·TNR 이고 π=1.46%라 거의 TNR 과 같습니다(2편).</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 3</h3><p>Q3. 표준화(StandardScaler)를 Pipeline 안에 넣은 이유는?</p><ol><li>코드가 짧아져서<br><span class=cap>오해: 그것도 장점이지만 핵심은 아닙니다.</span></li><li><b>fold마다 학습 데이터로만 평균·표준편차를 계산해, 검증 fold 정보가 새어 들어가지 않게(누수 방지) ✔ 정답</b></li><li>Pipeline 이 class_weight 를 자동으로 정해서<br><span class=cap>오해: class_weight 는 모델 설정입니다.</span></li></ol><p><b>해설</b> 전체 데이터로 표준화한 뒤 나누면 검증 fold 의 평균·분산이 학습에 섞입니다. 과제 제약 3번(누수 금지)에 해당합니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 4</h3><p>Q4. 로지스틱의 fold별 재현율은 0.670~0.773 이었습니다. 보고서에 쓸 때 가장 알맞은 표현은?</p><ol><li>재현율 0.773 (가장 좋은 fold)<br><span class=cap>오해: 가장 좋은 fold 만 고르면 과장입니다.</span></li><li><b>재현율 0.7185 ± 0.0395 (5-Fold 평균 ± 표준편차) ✔ 정답</b></li><li>재현율 0.72 (한 번 잰 값)<br><span class=cap>오해: 과제는 홀드아웃 1회 결과를 감점합니다.</span></li></ol><p><b>해설</b> fold 하나의 청구 고객은 185명이라 한두 명 차이로 몇 %포인트씩 움직입니다. 평균과 흔들림을 함께 씁니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><h3>강의 멘트</h3><div class="cols"><div class="card"><h3>5조각 나누기</h3><p><span class="tagx">도입</span> 오늘은 과제 문항 1, 5-Fold 교차검증으로 성능을 재는 법을 봅니다.</p><p><span class="tagx">시연</span> 버튼을 누르기 전에: 데이터를 섞지 않고 다섯 조각으로 자르면 fold마다 청구 수가 같을까요?</p><p><span class="tagx">질문</span> 섞지 않은 KFold 에서 청구가 가장 적은 fold 와 많은 fold 는 각각 몇 명인가요?</p><p><span class="tagx">정리</span> 층화 + 섞기로 fold마다 청구 185~186명. 오해: “KFold 면 다 같다”.</p></div><div class="card"><h3>fold별 점수</h3><p><span class="tagx">도입</span> fold 점수 5개와 평균 ± 표준편차를 표로 만듭니다.</p><p><span class="tagx">시연</span> 지표를 Recall 로 바꾸면 점들이 더 퍼질까요, 모일까요?</p><p><span class="tagx">질문</span> 의사결정나무 재현율이 가장 낮은 fold 는 몇 번이고 값은 얼마인가요?</p><p><span class="tagx">정리</span> 흔들림까지 보고한다. 오해: “가장 좋은 fold 를 쓰면 된다”.</p></div><div class="card"><h3>정확도의 함정</h3><p><span class="tagx">도입</span> Accuracy 만 보고하면 왜 위험한지 숫자로 봅니다.</p><p><span class="tagx">시연</span> 기준선의 정확도는 모델보다 높을까요, 낮을까요?</p><p><span class="tagx">질문</span> 기준선은 청구 고객을 몇 명 찾았나요?</p><p><span class="tagx">정리</span> 정확도 1등은 아무것도 안 하는 모델. 오해: “정확도 높으면 좋은 모델”.</p></div></div></div></div></section><section class="part" id="a2"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">2</div><h2>청구자만, 미청구자만 맞힌 비율<span class="en">해설형</span></h2><p><a href="2_conditional_accuracy.html#author-sec">2편 페이지의 교육자 안내로 돌아가기</a></p></div>
+<div class="body"><h3>확인 문제 (3개)</h3><div class="card"><h3>문제 1</h3><p>Q1. “청구자만 대상 정확도”를 조건부 확률로 쓰면?</p><ol><li>P(실제 = 청구 | 예측 = 청구)<br><span class=cap>오해: 그것은 정밀도입니다. 조건(세로줄 오른쪽)이 “예측 = 청구”입니다.</span></li><li><b>P(예측 = 청구 | 실제 = 청구) ✔ 정답</b></li><li>P(예측 = 실제)<br><span class=cap>오해: 그것은 전체 정확도입니다.</span></li></ol><p><b>해설</b> 조건이 “실제 = 청구”이므로 분모는 실제 청구자 927명입니다. 재현율(TPR)과 같습니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 2</h3><p>Q2. 로지스틱의 TPR 0.7184, TNR 0.7992, π 0.0146 일 때 전체 정확도에 가장 가까운 값은?</p><ol><li>(0.7184 + 0.7992) ÷ 2 = 0.7588<br><span class=cap>오해: 그것은 균형 정확도입니다. 두 그룹의 크기를 같게 본 값입니다.</span></li><li><b>0.0146 × 0.7184 + 0.9854 × 0.7992 ≈ 0.7981 ✔ 정답</b></li><li>0.7184 × 0.7992 ≈ 0.574<br><span class=cap>오해: 곱이 아니라 가중 평균입니다.</span></li></ol><p><b>해설</b> 가중치가 그룹 비율이라, 청구 비율이 작을수록 전체 정확도는 TNR에 가까워집니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 3</h3><p>Q3. 임계값을 낮추면(더 많이 “청구”라고 판정하면) 두 조건부 정확도는?</p><ol><li>둘 다 오른다<br><span class=cap>오해: 더 많이 청구라고 하면 미청구자를 청구로 잘못 판정하는 일도 늘어 TNR은 내려갑니다.</span></li><li><b>TPR은 오르고 TNR은 내려간다 ✔ 정답</b></li><li>둘 다 그대로다<br><span class=cap>오해: 임계값은 혼동행렬 네 칸을 모두 바꿉니다.</span></li></ol><p><b>해설</b> 임계값 슬라이더에서 확인할 수 있습니다. 극단으로 가면 “모두 청구”(TPR 1, TNR 0)가 됩니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><h3>강의 멘트</h3><div class="cols"><div class="card"><h3>정의</h3><p><span class="tagx">도입</span> 청구자만 정확도와 미청구자만 정확도를 조건부 확률로 씁니다.</p><p><span class="tagx">시연</span> 청구자만 정확도의 분모는 무엇일까요?</p><p><span class="tagx">질문</span> 로지스틱의 TP 와 FN 은 각각 몇 명인가요?</p><p><span class="tagx">정리</span> P(예측=청구 | 실제=청구) = 재현율. 오해: 정밀도와 혼동.</p></div><div class="card"><h3>두 그룹 비교</h3><p><span class="tagx">도입</span> 다섯 모델과 극단 모델 두 개를 나란히 봅니다.</p><p><span class="tagx">시연</span> “모두 청구” 모델의 청구자만 정확도는 얼마일까요?</p><p><span class="tagx">질문</span> 두 값이 서로 반대로 움직이는 모델을 찾아보세요.</p><p><span class="tagx">정리</span> TPR 과 TNR 은 교환 관계. 한쪽만 보고하지 않는다.</p></div><div class="card"><h3>전체 정확도와의 관계</h3><p><span class="tagx">도입</span> 전체 정확도 = π·TPR + (1−π)·TNR 을 확인합니다.</p><p><span class="tagx">시연</span> π 를 50%로 올리면 보라 점선은 어느 쪽으로 갈까요?</p><p><span class="tagx">질문</span> 실제 π 에서 전체 정확도는 TPR 과 TNR 중 어느 쪽에 가까운가요?</p><p><span class="tagx">정리</span> 청구 비율이 작으면 전체 정확도 ≈ TNR.</p></div></div></div></div></section><section class="part" id="a3"><div class="wrap"><div class="part-head" style="--kc:var(--data)"><div class="hex">3</div><h2>그 숫자를 성능이라 부르면 생기는 일<span class="en">방법형</span></h2><p><a href="3_problems_fixes.html#author-sec">3편 페이지의 교육자 안내로 돌아가기</a></p></div>
+<div class="body"><h3>확인 문제 (4개)</h3><div class="card"><h3>문제 1</h3><p>Q1. “청구자만 정확도 100%”인 모델이 있다면 가장 먼저 확인할 것은?</p><ol><li>훌륭한 모델이니 바로 배포한다<br><span class=cap>오해: “모두 청구”라고 답해도 100%입니다.</span></li><li><b>미청구자만 정확도(TNR)와 정밀도 · 심사 비율 ✔ 정답</b></li><li>학습 시간<br><span class=cap>오해: 성능 해석과 관계없습니다.</span></li></ol><p><b>해설</b> “모두 청구” 모델은 TPR 1, TNR 0, 정밀도 1.46%, 심사 비율 100%입니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 2</h3><p>Q2. 한 fold 에서 청구자 185명 중 133명을 찾았습니다(0.719). 95% Wilson 신뢰구간에 가장 가까운 것은?</p><ol><li>[0.715, 0.723]<br><span class=cap>오해: 분모가 185명이라 이렇게 좁을 수 없습니다.</span></li><li><b>[0.650, 0.779] ✔ 정답</b></li><li>[0.30, 0.99]<br><span class=cap>오해: 너무 넓습니다. 계산기로 확인해 보세요.</span></li></ol><p><b>해설</b> 반폭이 약 ±6.5%p입니다. fold 사이 0.670~0.773의 차이가 대부분 이 흔들림 안에 있습니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 3</h3><p>Q3. 배포 환경의 청구 비율이 1.46% → 5%로 오르면, 같은 모델(TPR·TNR 그대로)의 정밀도는?</p><ol><li>그대로 0.05<br><span class=cap>오해: 정밀도는 기저율에 따라 바뀝니다.</span></li><li><b>약 0.16으로 오른다 ✔ 정답</b></li><li>내려간다<br><span class=cap>오해: 청구자가 많아지면 걸러 낸 고객 중 진짜 청구 비율은 오릅니다.</span></li></ol><p><b>해설</b> PPV = 0.7184×0.05 ÷ (0.7184×0.05 + 0.2008×0.95) ≈ 0.159. TPR·TNR만 보고하면 이 변화가 보이지 않습니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 4</h3><p>Q4. 개선 방안이 과제 형식을 지키려면 반드시 들어가야 할 것은?</p><ol><li>사용한 라이브러리 버전<br><span class=cap>오해: 도움은 되지만 과제 요구가 아닙니다.</span></li><li><b>(a) 무엇을 바꾸는지 (b) 왜 해결되는지 (c) 어떤 지표로 확인할지 ✔ 정답</b></li><li>문제점과 상관없는 일반적인 팁<br><span class=cap>오해: 1:1 대응이어야 합니다.</span></li></ol><p><b>해설</b> 대응표의 다섯 줄이 모두 (a)(b)(c) 세 칸을 채우고 있습니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><h3>강의 멘트</h3><div class="cols"><div class="card"><h3>1:1 대응표</h3><p><span class="tagx">도입</span> 청구자만 정확도를 성능으로 부를 때의 문제 다섯 가지와 개선 방안.</p><p><span class="tagx">시연</span> “모두 청구”로 답하면 청구자만 정확도가 몇 %일까요?</p><p><span class="tagx">질문</span> 표의 (c) 칸에 적힌 지표 중 임계값과 무관한 것은?</p><p><span class="tagx">정리</span> 문제점마다 (a)(b)(c)를 채운다.</p></div><div class="card"><h3>신뢰구간</h3><p><span class="tagx">도입</span> 분모 185명의 흔들림을 Wilson 구간으로 봅니다.</p><p><span class="tagx">시연</span> 133/185 의 95% 구간 폭은 몇 %p 쯤일까요?</p><p><span class="tagx">질문</span> 로지스틱과 SVC 의 구간은 겹치나요?</p><p><span class="tagx">정리</span> 작은 차이를 우열로 말하지 않는다.</p></div><div class="card"><h3>기저율과 중첩 검증</h3><p><span class="tagx">도입</span> 청구 비율이 바뀌면 정밀도가 어떻게 되는지, 임계값을 어디서 고르는지.</p><p><span class="tagx">시연</span> 청구 비율이 5%가 되면 정밀도는 오를까요?</p><p><span class="tagx">질문</span> 중첩 교차검증의 TPR 평균은 목표 80%를 지켰나요?</p><p><span class="tagx">정리</span> 선택은 학습 fold 안에서만.</p></div></div></div></div></section><section class="part" id="a4"><div class="wrap"><div class="part-head" style="--kc:var(--seq)"><div class="hex">4</div><h2>그 모델, HTML에 그대로 넣어도 될까<span class="en">정리형</span></h2><p><a href="4_html_deploy.html#author-sec">4편 페이지의 교육자 안내로 돌아가기</a></p></div>
+<div class="body"><h3>확인 문제 (3개)</h3><div class="card"><h3>문제 1</h3><p>Q1. 로지스틱 계수 58개만 HTML 로 옮기면 왜 안 될까요?</p><ol><li>계수가 너무 많아서<br><span class=cap>오해: 58개는 아주 작습니다.</span></li><li><b>계수는 정리·인코딩·표준화를 거친 입력에 곱하는 값이라, 그 단계(규칙·사전·평균·표준편차·열 순서)가 함께 와야 같은 계산이 되기 때문 ✔ 정답</b></li><li>브라우저는 소수 계산을 못해서<br><span class=cap>오해: JS 는 sklearn 과 소수점 아래 15자리까지 같은 값을 냅니다(이 페이지 검증).</span></li></ol><p><b>해설</b> 규칙 하나(성별 빈칸)만 빠져도 52%의 판정이 바뀝니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 2</h3><p>Q2. 성별이 빈 고객을 규칙 없이 계산하면 왜 판정이 크게 바뀔까요?</p><ol><li><b>빈칸이 0으로 바뀌어 성별 열이 모두 0이 되고, drop_first 로 빠진 기준 범주(F)처럼 계산되기 때문 ✔ 정답</b></li><li>브라우저가 오류를 내서<br><span class=cap>오해: 오류 없이 조용히 틀린 값을 냅니다. 그래서 더 위험합니다.</span></li><li>성별은 판정에 영향이 없어서<br><span class=cap>오해: Unknown 범주의 계수가 커서(청구율 0.64%) 영향이 큽니다.</span></li></ol><p><b>해설</b> 학습 때 Unknown 은 별도 범주였습니다. 배포 때 그 범주가 사라지면 다른 고객으로 계산됩니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 3</h3><p>Q3. 브라우저 판정이 맞는지 확인하는 가장 확실한 방법은?</p><ol><li>몇 명만 손으로 계산해 본다<br><span class=cap>오해: 경계 근처 고객에서 생기는 차이를 놓칩니다.</span></li><li><b>시험 데이터 전원을 브라우저로 판정해 sklearn 판정과 일치율(100%)과 최대 확률 차이를 확인한다 ✔ 정답</b></li><li>계수 합이 같은지 본다<br><span class=cap>오해: 열 순서가 틀려도 합은 같습니다.</span></li></ol><p><b>해설</b> 이 페이지는 12,666명 전원을 다시 계산해 sklearn 과 같은 판정인지 보여 줍니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><h3>강의 가이드라인</h3><div class="cols"><div class="card"><h3>1. 결론과 근거를 분리</h3><ul><li>결론(그대로 불가)을 먼저, 근거 세 가지(객체 형식 · 입력 전처리 · 평가용 모델)를 뒤에.</li></ul></div><div class="card"><h3>2. 분포 차이를 숫자로</h3><ul><li>규칙 누락 실험(52.2% · 1.2% · 0.1%)을 학생이 직접 재현하게 한다.</li><li>청구 비율 차이는 3편 PPV 로 연결.</li></ul></div><div class="card"><h3>3. 흔한 오해</h3><ul><li>“로지스틱은 계수만 옮기면 된다”(X)</li><li>“브라우저 계산은 부정확하다”(X): 차이 10⁻⁷ 수준</li><li>“서버 API 가 늘 최선”(X): 단일 HTML 조건 위반</li></ul></div><div class="card"><h3>4. 쉬운 말 고정</h3><ul><li>인코딩 사전 = 범주 번호표</li><li>기준 범주 = 모든 열이 0일 때의 범주</li></ul></div><div class="card"><h3>5. 한계</h3><ul><li>시험 데이터는 같은 시기의 데이터다. 시간에 따른 변화(드리프트)는 따로 모니터링해야 한다.</li></ul></div><div class="card"><h3>6. 수업 운영</h3><ul><li>50분: 결론 5 · 내보낼 것 10 · 규칙 끄기 실험 15 · 개별 판정 10 · 대안 토론 10.</li></ul></div></div><h3>강의 멘트</h3><div class="cols"><div class="card"><h3>결론</h3><p><span class="tagx">도입</span> 문항 4의 결론을 먼저: 그대로는 안 된다.</p><p><span class="tagx">시연</span> 계수 58개만 옮기면 무엇이 빠질까요?</p><p><span class="tagx">질문</span> 함께 내보낼 일곱 가지를 말해 보세요.</p><p><span class="tagx">정리</span> 모델 = 규칙 + 사전 + 열 순서 + 표준화 + 계수 + 임계값.</p></div><div class="card"><h3>빼먹으면</h3><p><span class="tagx">도입</span> 전처리 규칙을 하나씩 꺼 봅니다.</p><p><span class="tagx">시연</span> 성별 규칙을 끄면 몇 % 의 판정이 바뀔까요?</p><p><span class="tagx">질문</span> 규칙을 모두 켰을 때 sklearn 과 다른 판정은 몇 명인가요?</p><p><span class="tagx">정리</span> 조용히 틀린다. 전원 비교로 검증한다.</p></div><div class="card"><h3>대안</h3><p><span class="tagx">도입</span> 배포 방식 네 가지를 비교합니다.</p><p><span class="tagx">시연</span> “단일 HTML” 조건을 어기는 대안은?</p><p><span class="tagx">질문</span> 권장안의 근거 두 가지는?</p><p><span class="tagx">정리</span> 로지스틱 JSON(정확) + 필요하면 규칙 기준서(설명).</p></div></div></div></div></section><section class="part" id="a5"><div class="wrap"><div class="part-head" style="--kc:var(--data)"><div class="hex">5</div><h2>희소 이벤트는 어디에나 있다<span class="en">정리형</span></h2><p><a href="5_similar_cases.html#author-sec">5편 페이지의 교육자 안내로 돌아가기</a></p></div>
+<div class="body"><h3>확인 문제 (3개)</h3><div class="card"><h3>문제 1</h3><p>Q1. 유방암 검진의 민감도 86.9%, 특이도 88.9%인데 재검 판정 중 실제 암은 4.4%뿐입니다. 가장 큰 이유는?</p><ol><li>의사들이 실력이 부족해서<br><span class=cap>오해: 성능 기준을 충족한 평균값입니다. 문제는 사람이 아니라 기저율입니다.</span></li><li><b>검진 대상 중 암 환자가 매우 드물어서 (기저율 약 0.6%) ✔ 정답</b></li><li>표본이 작아서<br><span class=cap>오해: 검진 168만 건이 넘는 큰 연구입니다.</span></li></ol><p><b>해설</b> 건강한 사람 99.4% × 거짓 경보율 11.1%가 암 환자 0.6% × 86.9%보다 훨씬 큽니다. 우리 데이터의 정밀도 5%도 같은 이유입니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 2</h3><p>Q2. 이 과제의 전략으로 쓸 수 없는 것은?</p><ol><li>class_weight='balanced'<br><span class=cap>오해: 가중치는 데이터를 바꾸지 않으므로 허용됩니다.</span></li><li>학습 CV 확률로 임계값 조정<br><span class=cap>오해: 과제가 허용하는 방법입니다.</span></li><li><b>SMOTE로 청구 행을 만들어 50:50으로 맞추기 ✔ 정답</b></li></ol><p><b>해설</b> 과제 규칙상 증강(SMOTE · 오버샘플링 · 합성 · 복제)은 금지입니다. 사례 논문이 샘플링을 썼더라도 우리는 가중치와 임계값만 씁니다.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><div class="card"><h3>문제 3</h3><p>Q3. 디스크 고장률(1.36%)은 우리 청구율(1.46%)과 비슷합니다. 경고 규칙이 민감도 0.767, 특이도 0.958이면 경고 중 실제 고장은 대략?</p><ol><li><b>약 20% ✔ 정답</b></li><li>약 77%<br><span class=cap>오해: 77%는 민감도(고장 중 경고 비율)입니다. 방향이 반대입니다.</span></li><li>약 96%<br><span class=cap>오해: 96%는 특이도입니다.</span></li></ol><p><b>해설</b> 0.767×0.0136 ÷ (0.767×0.0136 + 0.042×0.9864) ≈ 0.20. 위 계산기에서 ‘디스크 고장’ 버튼을 눌러 확인해 보세요.</p><p class="cap"><b>배점</b> 2점 · 정답 + 이유 한 문장 = 2점, 정답만 = 1점, 오답이어도 핵심 이유를 말하면 1점</p></div><h3>강의 가이드라인</h3><div class="cols"><div class="card"><h3>1. 출처 확인</h3><ul><li>사례의 숫자는 반드시 원문(논문·공식 페이지)에서 확인하게 한다.</li><li>요약은 본인 말로 다시 쓰게 한다.</li></ul></div><div class="card"><h3>2. 같은 점을 구조로</h3><ul><li>기저율 · 놓친 양성의 비용 · 오탐의 비용 · 정확도의 함정 네 가지로 비교한다.</li></ul></div><div class="card"><h3>3. 흔한 오해</h3><ul><li>“사기 데이터는 증강하면 해결된다”(X): 이 과제는 증강 금지, 실무도 비용 민감 학습·임계값·평가지표가 먼저.</li><li>“민감도·특이도가 높으면 정밀도도 높다”(X): 기저율이 낮으면 정밀도는 낮다.</li></ul></div><div class="card"><h3>4. 쉬운 말 고정</h3><ul><li>기저율 = 원래 비율</li><li>PPV = 걸러 낸 것 중 진짜</li></ul></div><div class="card"><h3>5. 우선순위의 근거</h3><ul><li>각 전략에 확인 지표를 하나씩 붙이게 한다.</li></ul></div><div class="card"><h3>6. 수업 운영</h3><ul><li>50분: 사례 읽기 15 · PPV 계산기 10 · 같은 점 표 10 · 우선순위 토론 15.</li></ul></div></div><h3>강의 멘트</h3><div class="cols"><div class="card"><h3>사례</h3><p><span class="tagx">도입</span> 다른 산업의 희소 이벤트 탐지 사례를 봅니다.</p><p><span class="tagx">시연</span> 카드 사기의 양성 비율은 이 데이터보다 높을까요, 낮을까요?</p><p><span class="tagx">질문</span> 사례마다 출처는 어디인가요?</p><p><span class="tagx">정리</span> 출처를 직접 열어 숫자를 확인한다.</p></div><div class="card"><h3>같은 구조</h3><p><span class="tagx">도입</span> 기저율 · 민감도 · 특이도로 정밀도를 계산합니다.</p><p><span class="tagx">시연</span> 기저율이 0.17%면 민감도 80%·특이도 95%에서 정밀도는?</p><p><span class="tagx">질문</span> 이 데이터의 정밀도와 비교하면?</p><p><span class="tagx">정리</span> 희소할수록 정밀도가 낮다: 구조의 문제.</p></div><div class="card"><h3>우선순위</h3><p><span class="tagx">도입</span> 이 과제에 적용할 해결 전략 세 가지를 고릅니다.</p><p><span class="tagx">시연</span> 세 가지 중 가장 먼저 할 것은?</p><p><span class="tagx">질문</span> 각 전략을 확인할 지표는?</p><p><span class="tagx">정리</span> 비용 민감 학습 · 정직한 평가 · 배포 검증.</p></div></div></div></div></section><footer><div class="wrap"><p>AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 · 교육자용 정답 · 글 · 안상선 ((주)M-Robo 대표)</p><p><b>주의:</b> 교육용 예시이며 보험 가입·보험료·보상에 대한 조언이 아닙니다. 실제 보험 심사와 보험료 산정은 감독 규정과 계리 기준을 따릅니다. 특정 집단에 불리한 특성(예: 성별·나이)의 사용은 금지되거나 제한될 수 있습니다.</p><p><a href="https://creativecommons.org/licenses/by-nc/4.0/deed.ko">CC BY-NC 4.0</a></p></div></footer>
+<p id="lang-note" class="note" hidden style="position:fixed;bottom:12px;left:12px;right:12px;z-index:30"></p>
+<script>const SITE="https://adminmrobo.github.io/ai-biz-insurtech-02/";
+// ---------- 공통: 테마 색 읽기 ----------
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+const REDRAW=[];function onTheme(f){REDRAW.push(f)}
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>REDRAW.forEach(f=>f()))}catch(e){}
+new MutationObserver(()=>REDRAW.forEach(f=>f())).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+// 캔버스 준비 (선명하게)
+function prep(cv,h){const r=cv.getBoundingClientRect();const w=Math.max(200,r.width||cv.parentNode.clientWidth||600);const d=window.devicePixelRatio||1;cv.width=w*d;cv.height=h*d;cv.style.height=h+'px';const c=cv.getContext('2d');c.setTransform(d,0,0,d,0,0);return {c,w,h}}
+let RZ;addEventListener('resize',()=>{clearTimeout(RZ);RZ=setTimeout(()=>REDRAW.forEach(f=>f()),150)});
+const fmtP=(x,d=1)=>(x*100).toFixed(d)+'%';
+const nf=n=>Number(n).toLocaleString('en-US');
+// ---------- 확인 문제 ----------
+document.querySelectorAll('.q').forEach(q=>{const ok=q.dataset.ok,fb=q.querySelector('.fb');q.querySelectorAll('.opts button').forEach(b=>b.addEventListener('click',()=>{
+ q.querySelectorAll('.opts button').forEach(x=>x.classList.remove('right','wrong'));
+ if(b.dataset.i===ok){b.classList.add('right');fb.innerHTML='<b>정답입니다.</b> '+q.dataset.ex}else{b.classList.add('wrong');fb.innerHTML='<b>다시 생각해 보세요.</b> '+(b.dataset.why||'')}}))});
+// ---------- 복사 · 내려받기 ----------
+function copyTxt(t,btn){const o=btn.textContent;const done=()=>{btn.textContent='복사됨';setTimeout(()=>btn.textContent=o,1300)};try{navigator.clipboard.writeText(t).then(done,()=>{btn.textContent='직접 선택해 복사하세요'})}catch(e){btn.textContent='직접 선택해 복사하세요'}}
+function saveFile(name,text,type){try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type||'text/plain'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}catch(e){}}
+function toIpynb(src,formal){const lines=src.split('\n');const cells=[];let cur=[];
+ lines.forEach(l=>{if(/^# [①-⑳]/.test(l)&&cur.join('').trim()){cells.push(cur);cur=[]}cur.push(l)});if(cur.join('').trim())cells.push(cur);
+ const mk=a=>{while(a.length&&!a[a.length-1].trim())a.pop();return {cell_type:'code',metadata:{},execution_count:null,outputs:[],source:a.map((l,i)=>i<a.length-1?l+'\n':l)}};
+ const out=cells.map(mk).filter(c=>c.source.join('').trim());
+ if(formal)out.unshift(mk(['# 공통 코드 내려받기 (Colab)','!wget -q -O common.py '+SITE+'code/common.py']));
+ return JSON.stringify({cells:out,metadata:{kernelspec:{name:'python3',display_name:'Python 3'},language_info:{name:'python'}},nbformat:4,nbformat_minor:5},null,1)}
+document.querySelectorAll('.codebox').forEach(box=>{const tabs=[...box.querySelectorAll('.tabs button')];const pre=box.querySelector('pre code');const info=box.querySelector('.tools span');
+ let curId=null;function show(b){tabs.forEach(t=>t.setAttribute('aria-selected',t===b?'true':'false'));curId=b.dataset.src;const s=document.getElementById(curId);pre.textContent=s.textContent.replace(/^\n/,'');info.textContent=b.dataset.info||''}
+ tabs.forEach(t=>t.addEventListener('click',()=>show(t)));if(tabs[0])show(tabs[0]);
+ box.querySelector('[data-act=copy]').addEventListener('click',e=>copyTxt(pre.textContent,e.currentTarget));
+ box.querySelector('[data-act=py]').addEventListener('click',()=>{const s=document.getElementById(curId);saveFile(s.dataset.file,pre.textContent,'text/x-python')});
+ box.querySelector('[data-act=nb]').addEventListener('click',()=>{const s=document.getElementById(curId);saveFile(s.dataset.file.replace(/\.py$/,'.ipynb'),toIpynb(pre.textContent,s.dataset.formal==='1'),'application/json')})});
+document.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',e=>copyTxt(document.getElementById(b.dataset.copy).textContent,e.currentTarget)));
+document.querySelectorAll('[data-save]').forEach(b=>b.addEventListener('click',()=>saveFile(b.dataset.name,document.getElementById(b.dataset.save).textContent)));
+// ---------- 상태 캐릭터 ----------
+function robo(id,st){const w=document.getElementById(id);if(!w||w.dataset.st===st)return;w.dataset.st=st;w.querySelectorAll('[data-rs]').forEach(e=>e.hidden=e.dataset.rs!==st)}
+// ---------- 식구 카드: 모습 바꾸기 ----------
+document.querySelectorAll('.crew .moods button').forEach(b=>b.addEventListener('click',()=>{const card=b.closest('.crew');
+ card.querySelectorAll('.moods button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+ card.querySelectorAll('.cf').forEach(f=>f.classList.toggle('on',f.dataset.face===b.dataset.fb))}));
+// ---------- 막대 (기준선 포함) ----------
+function setBar(el,v,base){el.querySelector('.fill').style.width=Math.max(0,Math.min(1,v))*100+'%';const bl=el.querySelector('.base');if(bl){if(base==null)bl.hidden=true;else{bl.hidden=false;bl.style.left='calc('+base*100+'% - 1px)'}}el.querySelector('.v').textContent=fmtP(v)}
+// ---------- 혼동행렬 ----------
+function cmHTML(m){return `<div></div><div class="h">판정: 청구 없음</div><div class="h">판정: 청구 위험</div>
+ <div class="h rh">실제 미청구</div><div class="c ok"><b>${nf(m.tn)}</b><span>정상 통과</span></div><div class="c"><b>${nf(m.fp)}</b><span>추가 심사 (오탐)</span></div>
+ <div class="h rh">실제 청구</div><div class="c bad"><b>${nf(m.fn)}</b><span>⚠ 놓친 청구</span></div><div class="c ok"><b>${nf(m.tp)}</b><span>찾은 청구</span></div>`}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<script>
+(function(){var KEY='it2_lang',AVAILABLE=['ko'],LANGS=['ko','en','zh','ja','uz','ru'];
+var cur=document.documentElement.lang||'ko';cur=cur.slice(0,2);
+function root(){var p=location.pathname;var dir=p.replace(/[^\/]*$/,'');if(cur!=='ko'){dir=dir.replace(/[^\/]+\/$/,'')}return dir}
+function file(){var f=location.pathname.split('/').pop();if(!f)f='index.html';if(!/\.html?$/.test(f))f+='.html';return f}
+function url(l){return root()+(l==='ko'?'':l+'/')+file()+location.search.replace(/[?&]lang=[^&]*/,'').replace(/^&/,'?')+location.hash}
+function exists(u,cb){if(location.protocol==='file:'){cb(true);return}try{fetch(u,{method:'HEAD'}).then(function(r){cb(!(r.status===404||r.status===410))},function(){cb(true)})}catch(e){cb(true)}}
+function save(l){try{localStorage.setItem(KEY,l)}catch(e){}}
+function drop(){try{localStorage.removeItem(KEY)}catch(e){}}
+window.itSetLang=function(l,manual){if(l===cur)return;
+ if(AVAILABLE.indexOf(l)<0){if(manual){var n=document.getElementById('lang-note');if(n){n.hidden=false;n.textContent='이 언어판은 아직 준비 중입니다 ('+l+'). 한국어판을 보여 드립니다.'}}else{drop()}return}
+ var u=url(l);exists(u,function(ok){if(ok){if(manual)save(l);location.href=u}else{drop();if(manual){var n=document.getElementById('lang-note');if(n){n.hidden=false;n.textContent='언어판 파일을 찾지 못했습니다: '+u}}}})};
+var q=(location.search.match(/[?&]lang=([a-z]{2})/)||[])[1];
+if(q&&LANGS.indexOf(q)>=0){save(q);if(q!==cur)itSetLang(q,true);return}
+var s=null;try{s=localStorage.getItem(KEY)}catch(e){}
+if(s&&s!==cur){itSetLang(s,false);return}
+if(!s){var b=(navigator.language||'ko').slice(0,2);if(b!==cur&&AVAILABLE.indexOf(b)>=0)itSetLang(b,false)}
+})();
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>2편 · 청구자만, 미청구자만 맞힌 비율 | 인슈어테크 #2 실전</title>
+<meta name="description" content="AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 2편. 청구자만 정확도는 재현율(TPR), 미청구자만 정확도는 특이도(TNR). 전체 정확도 = π·TPR + (1−π)·TNR 을 직접 확인한다.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Silkscreen&display=swap">
+<style>
+
+.say .av:has(img){background:#fff}
+.say .av img{display:block}
+img.scene{display:block;width:100%;max-width:720px;height:auto;aspect-ratio:9/5;object-fit:cover;border-radius:var(--r)}
+img.keyvis{display:block;width:100%;height:auto;aspect-ratio:1100/320;object-fit:cover;border-radius:var(--r)}
+img.pic{display:block;width:100%;height:auto;aspect-ratio:480/440;object-fit:cover;border-radius:6px}
+.crew .cf{background:#fff}
+.crew .cf img{width:100%;height:100%;object-fit:contain}
+.crew .moods button img{width:36px;height:36px;border-radius:7px;display:block}
+/* 레이아웃: 보상 센터 연구 노트 — 상단 바 · 히어로(그림 자리) · 육각 번호 섹션 · 카드형 실습 */
+:root{
+  --bg:#f6f5fb; --surface:#ffffff; --sunken:#eeecf7; --ink:#1d1a2e; --muted:#5d5873; --line:#dcd8ea;
+  --accent:#5b47c9; --accent-ink:#ffffff; --accent-soft:#ece8ff;
+  --core:#6a4fd8; --data:#c2417a; --seq:#13857f;
+  --c-no:#2f86c9; --c-claim:#d9730d; --c-3:#7b61d9; --c-4:#1f9e78;
+  --risk:#b4471b; --risk-bg:#fdeee6; --safe:#1f7a5c; --safe-bg:#e5f4ee; --warn:#9a620e; --warn-bg:#fbf1df;
+  --grid:#e6e3f0;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --f-pixel:"Silkscreen","IBM Plex Mono",monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12111a; --surface:#1b1a26; --sunken:#0e0d15; --ink:#ece9f7; --muted:#a29dba; --line:#2e2b40;
+  --accent:#a998ff; --accent-ink:#14121f; --accent-soft:#2a2547;
+  --core:#a48cf0; --data:#f07aaa; --seq:#4cc3b9;
+  --c-no:#3f8fd2; --c-claim:#d8742a; --c-3:#8a74e0; --c-4:#26a17c;
+  --risk:#f08a5d; --risk-bg:#3a1f16; --safe:#5fcf9f; --safe-bg:#14302a; --warn:#e3aa52; --warn-bg:#33270f;
+  --grid:#2a2738; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12111a; --surface:#1b1a26; --sunken:#0e0d15; --ink:#ece9f7; --muted:#a29dba; --line:#2e2b40;
+  --accent:#a998ff; --accent-ink:#14121f; --accent-soft:#2a2547;
+  --core:#a48cf0; --data:#f07aaa; --seq:#4cc3b9;
+  --c-no:#3f8fd2; --c-claim:#d8742a; --c-3:#8a74e0; --c-4:#26a17c;
+  --risk:#f08a5d; --risk-bg:#3a1f16; --safe:#5fcf9f; --safe-bg:#14302a; --warn:#e3aa52; --warn-bg:#33270f;
+  --grid:#2a2738; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.7;word-break:keep-all;overflow-wrap:break-word}
+a{color:var(--accent)}
+h1,h2,h3{line-height:1.3;text-wrap:balance;margin:0}
+p{margin:0}
+code,pre,.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:20px}
+nav.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+nav.top .wrap{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;padding-block:8px}
+nav.top .brand{font-weight:700;text-decoration:none;color:var(--ink);white-space:nowrap}
+nav.top .brand b{font-family:var(--f-pixel);font-weight:400;color:var(--accent);margin-left:4px}
+nav.top .links{display:flex;gap:2px 12px;flex-wrap:wrap;font-size:.86rem;flex:1;min-width:0}
+nav.top .links a{color:var(--muted);text-decoration:none}
+nav.top .links a:hover{color:var(--ink)}
+nav.top select{width:auto;font:inherit;font-size:.82rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+header.hero{padding-block:28px 20px}
+.hero-grid{display:grid;gap:18px}
+.series{display:flex;flex-wrap:wrap;gap:6px}
+.series a{font-size:.78rem;text-decoration:none;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--surface)}
+.series a.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.kicker{font-family:var(--f-pixel);font-size:.82rem;color:var(--accent);letter-spacing:.04em}
+h1{font-size:clamp(1.7rem,4.2vw,2.5rem);font-weight:700;letter-spacing:-.015em}
+.lead{font-size:1.06rem;color:var(--muted);max-width:68ch}
+.byline{font-size:.84rem;color:var(--muted)}
+.guide{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted)}
+.guide span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.chat{display:grid;gap:10px;max-width:760px}
+.say{display:flex;gap:12px;align-items:flex-start}
+.say .av{flex:0 0 52px;height:52px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:1.05rem;color:var(--accent-ink);background:var(--avc,var(--accent));position:relative;overflow:hidden}
+.say .av img{width:100%;height:100%;object-fit:cover;object-position:50% 18%}
+.say .av small{position:absolute;bottom:2px;left:0;right:0;font-size:.55rem;font-weight:500;text-align:center;opacity:.85}
+.say .sbub{background:var(--surface);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:8px 14px;min-width:0}
+.say .sbub b{font-size:.8rem;color:var(--muted);display:block}
+.say .sbub ul{margin:4px 0 0;padding-left:1.2em}
+.npc{display:inline-block;margin-left:6px;font-family:var(--f-pixel);font-size:.62rem;font-weight:400;letter-spacing:.06em;color:#3a2a00;background:#f2c94c;border:1px solid #b8901a;border-radius:3px;padding:0 5px;vertical-align:1px}
+.bomi{--avc:#d9730d}.actuary{--avc:#5b47c9}.fly{--avc:#13857f}.robo{--avc:#2f86c9}
+section.part{padding-block:34px 10px;border-top:1px solid var(--line);margin-top:26px}
+.part-head{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center;margin-bottom:16px}
+.hex{width:44px;height:50px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:var(--kc,var(--accent));color:#fff;display:grid;place-items:center;font-family:var(--f-pixel);font-size:1.05rem;grid-row:span 2}
+.part-head h2{font-size:1.4rem}
+.part-head h2 span.en{font-family:var(--f-pixel);font-weight:400;font-size:.72rem;color:var(--muted);margin-left:8px;letter-spacing:.03em}
+.part-head p{color:var(--muted);font-size:.94rem}
+.body{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.body>p,.body>ul,.body>ol{max-width:72ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:grid;gap:12px;min-width:0;align-content:start}
+.card h3{font-size:1.02rem}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.76rem;color:var(--muted);font-weight:600;letter-spacing:.02em;white-space:nowrap}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+tr.hl td{background:var(--accent-soft);font-weight:600}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit}
+.btn{text-decoration:none;display:inline-block;font-size:.9rem;font-weight:600;border-radius:8px;padding:7px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn[aria-pressed="true"],.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{font-size:.8rem;padding:3px 10px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dial{display:grid;gap:4px;min-width:0;align-content:start}
+.dial label{font-size:.86rem;font-weight:500;display:flex;justify-content:space-between;gap:8px}
+.dial label output{font-family:var(--f-mono);color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select,input[type=text],input[type=number]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-width:0}
+.canvas-box{position:relative;min-width:0}
+.canvas-box canvas{width:100%;display:block;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.cap{font-size:.86rem;color:var(--muted)}
+.cap b{color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:.76rem;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-120%);z-index:5}
+.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:8px}
+.stat>div{background:var(--sunken);border-radius:6px;padding:8px 12px;display:grid}
+.stat .l{font-size:.74rem;color:var(--muted)}
+.stat .v{font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:6.5em 1fr 4.2em;gap:8px;align-items:center;font-size:.84rem}
+.bar .track{position:relative;height:16px;background:var(--sunken);border-radius:4px}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;background:var(--c,var(--accent));transition:width .25s}
+.bar .base{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.bar .v{font-family:var(--f-mono);text-align:right}
+@media (prefers-reduced-motion:reduce){.bar .fill{transition:none}}
+.cm{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;max-width:440px;font-variant-numeric:tabular-nums}
+.cm .h{font-size:.76rem;color:var(--muted);font-weight:600;display:flex;align-items:end;padding:2px 4px}
+.cm .rh{align-items:center}
+.cm .c{border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:grid;background:var(--surface)}
+.cm .c b{font-size:1.15rem}
+.cm .c span{font-size:.74rem;color:var(--muted)}
+.cm .c.ok{background:var(--safe-bg);border-color:transparent}
+.cm .c.bad{background:var(--risk-bg);border:2px solid var(--risk)}
+.cm .c.bad span{color:var(--risk);font-weight:600}
+.pill{display:inline-block;font-size:.74rem;font-weight:600;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.pill.risk{background:var(--risk-bg);color:var(--risk)}.pill.safe{background:var(--safe-bg);color:var(--safe)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.pass{background:var(--safe-bg);color:var(--safe)}.pill.fail{background:var(--risk-bg);color:var(--risk)}
+.note{border-left:3px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 6px 6px 0;font-size:.9rem}
+.note.info{border-color:var(--accent);background:var(--accent-soft)}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px;display:grid;gap:10px}
+.q .qt{font-weight:600}
+.q .opts{display:grid;gap:6px}
+.q .opts button{text-align:left;font-size:.92rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+.q .opts button.right{border-color:var(--safe);background:var(--safe-bg)}
+.q .opts button.wrong{border-color:var(--risk);background:var(--risk-bg)}
+.q .fb{font-size:.9rem}
+.codebox{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.codebox .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);background:var(--sunken);padding:6px 6px 0}
+.codebox .tabs button{border:0;background:none;padding:6px 12px;border-radius:6px 6px 0 0;cursor:pointer;color:var(--muted);font-size:.84rem;font-family:var(--f-mono)}
+.codebox .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:500}
+.codebox .tools{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);align-items:center}
+.codebox .tools span{font-size:.78rem;color:var(--muted);flex:1;min-width:12em}
+.codebox pre{margin:0;padding:14px 16px;overflow:auto;max-height:440px;font-size:.8rem;line-height:1.55;white-space:pre}
+details.run{border:1px solid var(--line);border-radius:var(--r);background:var(--sunken)}
+details.run summary{cursor:pointer;padding:8px 14px;font-size:.88rem;font-weight:500}
+details.run pre{margin:0;padding:10px 16px 14px;overflow:auto;font-size:.78rem;line-height:1.5}
+.gloss{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px}
+.gloss div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px}
+.gloss dt{font-weight:600}.gloss dd{margin:2px 0 0;font-size:.88rem;color:var(--muted)}
+.gloss dd i{font-style:normal;color:var(--ink)}
+.prompt pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunken);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;font-size:.8rem;max-height:360px;overflow:auto;margin:0}
+.teach-link{display:inline-block;font-weight:600;text-decoration:none;border:1px solid var(--accent);border-radius:8px;padding:8px 14px}
+section.outro{margin-top:40px;padding-block:30px;border-top:1px solid var(--line)}
+.outro .scene{width:100%;max-width:720px;aspect-ratio:720/400;border-radius:var(--r)}
+.placeholder{display:grid;place-items:center;text-align:center;background:repeating-linear-gradient(135deg,var(--sunken) 0 12px,var(--surface) 12px 24px);border:1px dashed var(--line);color:var(--muted);font-size:.82rem;padding:10px}
+.nav-eps{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+footer{border-top:1px solid var(--line);margin-top:30px;padding-block:22px 40px;font-size:.82rem;color:var(--muted)}
+footer .wrap{display:grid;gap:8px}
+.robo-w{align-items:center}
+.robo-w .av{flex-basis:64px;height:64px;font-size:1.4rem}
+.robo-w[data-st="wrong"] .av{--avc:var(--risk)}
+.robo-w[data-st="success"] .av{--avc:var(--safe)}
+.robo-w[data-st="confused"] .av{--avc:var(--warn)}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.player input[type=range]{flex:1;min-width:140px}
+.stamp{justify-self:start;border:3px double currentColor;border-radius:4px;padding:6px 16px;font-weight:700;font-size:1.35rem;letter-spacing:.04em;transform:rotate(-2deg)}
+.stamp.risk{color:var(--risk)}.stamp.safe{color:var(--safe)}.stamp.reject{color:var(--warn)}
+@media (max-width:560px){body{font-size:15px}.part-head h2{font-size:1.2rem}.say .av{flex-basis:44px;height:44px}}
+
+.task{border:1px solid var(--line);border-left:4px solid var(--data);background:var(--surface);border-radius:0 var(--r) var(--r) 0;padding:14px 18px;display:grid;gap:8px}
+.task .tt{font-family:var(--f-pixel);font-size:.8rem;color:var(--data)}
+.task ul{margin:0;padding-left:1.2em}
+.answer{border:2px dashed var(--accent);border-radius:var(--r);padding:14px 18px;display:grid;gap:10px;background:var(--surface)}
+.answer .tt{font-weight:700;color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{font-size:.76rem;border:1px solid var(--line);border-radius:999px;padding:1px 9px;background:var(--sunken)}
+.chips span.ban{border-color:var(--risk);color:var(--risk);background:var(--risk-bg)}
+</style>
+</head>
+<body>
+<nav class="top"><div class="wrap"><a class="brand" href="index.html">인슈어테크 #2 실전<b>· 2</b></a><div class="links"><a href="#task">과제</a><a href="#define">정의</a><a href="#compare">두 그룹 비교</a><a href="#relation">전체 정확도와의 관계</a><a href="#folds">fold별</a><a href="#answer">답안 틀</a><a href="#check">확인 문제</a><a href="#practice">코드</a><a href="#prompt">프롬프트</a><a href="#glossary">용어</a><a href="answers.html#a2">교육자용 정답</a></div><select id="lang-sel" aria-label="언어 선택" onchange="itSetLang(this.value,true)"><option value="ko" selected>한국어</option><option value="en">English</option><option value="zh">中文</option><option value="ja">日本語</option><option value="uz">O'zbekcha</option><option value="ru">Русский</option></select></div></nav><header class="hero"><div class="wrap hero-grid"><div class="series" aria-label="시리즈 편 목록"><a href="1_kfold_cv.html" class="">1 5-Fold 검증</a><a href="2_conditional_accuracy.html" class="on" aria-current="page">2 청구자만 정확도</a><a href="3_problems_fixes.html" class="">3 문제점·개선</a><a href="4_html_deploy.html" class="">4 HTML 배포</a><a href="5_similar_cases.html" class="">5 유사 사례</a></div><p class="kicker">EPISODE 2 · 과제 문항 2 · 해설형 · Accuracy within each class</p>
+<h1>청구자만, 미청구자만 맞힌 비율</h1><p class="lead">과제 문항 2는 “실제로 청구한 사람들만 놓고” 정확도를 내라고 합니다. 그 숫자에는 이미 이름이 있습니다. <b>재현율(민감도, TPR)</b>입니다. 미청구자만 놓고 잰 정확도는 <b>특이도(TNR)</b>입니다. 이 편은 두 값을 5-Fold 검증 예측으로 계산하고, 1편의 전체 정확도와 어떤 식으로 이어지는지 보여 줍니다.</p><div class="chat"><div class="say bomi"><div class="av" data-face="curious" aria-hidden="true"><img src="assets/av_bomi_curious.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>조교</b><p>청구한 사람들만 놓고 보면 정확도가 좀 낮던데요. 70%쯤?</p></div></div><div class="say actuary"><div class="av" data-face="explain" aria-hidden="true"><img src="assets/av_actuary_explain.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>박사<span class="npc" title="NPC">NPC</span></b><p>(손바닥을 든다) …그 70%는 “청구자 중 맞힌 비율”입니다. 전체 정확도와는 분모가 다릅니다. 분모부터 정확히 적읍시다.</p></div></div><div class="say robo"><div class="av" data-face="thinking" aria-hidden="true"><img src="assets/av_robo_thinking.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>머니로보</b><p>삐빅. 분모 확인 완료. 분자는 지금 찾는 중.</p></div></div></div><p class="byline">글 · 안상선 ((주)M-Robo 대표) · AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전</p><div class="guide"><span style="--c:var(--c-claim)">청구자만 정확도 (TPR)</span><span style="--c:var(--c-no)">미청구자만 정확도 (TNR)</span><span style="--c:var(--c-3)">전체 정확도</span></div></div></header><section class="part" id="task"><div class="wrap"><div class="part-head" style="--kc:var(--data)"><div class="hex">0</div><h2>과제 문항 2<span class="en">Assignment 2</span></h2><p>무엇을 내야 하는지 먼저 확인합니다.</p></div><div class="body"><div class="task"><span class="tt">ASSIGNMENT · 문항 2</span><h3>실제 보험금을 청구한 사람들에 대해서만 예측할 때의 정확도</h3><div class=chips><span class="">조건부 정확도</span><span class="">두 그룹 비교</span></div><ul><li>실제 Claim = Yes 인 고객만을 대상으로 모델의 예측 정확도를 산출</li><li>같은 방식으로 Claim = No 인 고객만을 대상으로 한 정확도도 산출해 두 값을 나란히 비교</li><li>두 값이 각각 어떤 조건부 확률인지 정의를 쓰고, 문항 1의 전체 정확도와 어떤 관계인지 서술</li></ul></div></div></div></section><section class="part" id="define"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">1</div><h2>정의: 어떤 조건부 확률인가<span class="en">Definitions</span></h2><p>분모가 “실제 청구자”인지 “청구라고 판정한 사람”인지가 핵심입니다.</p></div><div class="body"><p>혼동행렬을 <b>행(실제 정답) 방향</b>으로 읽으면 두 값이 나옵니다. 아래는 로지스틱의 5-Fold 검증 예측(63,326명 전원, 각자 자기를 학습에 쓰지 않은 모델이 판정)입니다.</p>
+<div class="cols"><div class="card"><h3>로지스틱 · 5-Fold 검증 예측</h3><div class="cm"><div></div><div class="h">판정: 청구 없음</div><div class="h">판정: 청구</div>
+<div class="h rh">실제 미청구</div><div class="c ok"><b>49,872</b><span>TN</span></div><div class="c"><b>12,527</b><span>FP (오탐)</span></div>
+<div class="h rh">실제 청구</div><div class="c bad"><b>261</b><span>FN ⚠ 놓친 청구</span></div><div class="c ok"><b>666</b><span>TP</span></div></div></div>
+<div class="card"><h3>조건부 확률로 쓰면</h3>
+<p><b style="color:var(--c-claim)">청구자만 정확도</b> = P(예측 = 청구 | 실제 = 청구) = TP ÷ (TP + FN) = 666 ÷ 927 = <b>0.7184</b><br><span class="cap">= 재현율(Recall) = 민감도(Sensitivity) = TPR</span></p>
+<p><b style="color:var(--c-no)">미청구자만 정확도</b> = P(예측 = 없음 | 실제 = 없음) = TN ÷ (TN + FP) = 49,872 ÷ 62,399 = <b>0.7992</b><br><span class="cap">= 특이도(Specificity) = TNR</span></p>
+<p class="cap">반대로 <b>열(판정)</b> 방향으로 읽으면 정밀도 P(실제 = 청구 | 예측 = 청구) = 666 ÷ 13,193 = 0.0505 입니다. 조건이 뒤집히면 전혀 다른 숫자가 됩니다.</p></div></div></div></div></section><section class="part" id="compare"><div class="wrap"><div class="part-head" style="--kc:var(--data)"><div class="hex">2</div><h2>두 그룹을 나란히<span class="en">Side by side</span></h2><p>모든 모델에서 두 값은 서로 반대 방향으로 움직입니다.</p></div><div class="body"><div class="tblwrap"><table><thead><tr><th>모델 (5-Fold 검증 예측)</th><th class="r">청구자만 정확도 (TPR)</th><th class="r">미청구자만 정확도 (TNR)</th><th class="r">전체 정확도</th><th class="r">균형 정확도 (TPR+TNR)/2</th><th class="r">찾은 청구</th><th class="r">놓친 청구</th></tr></thead><tbody>
+<tr><td>로지스틱</td><td class="r"><b>0.7184</b></td><td class="r"><b>0.7992</b></td><td class="r">0.7981</td><td class="r">0.7588</td><td class="r">666</td><td class="r">261</td></tr><tr><td>선형 SVM</td><td class="r"><b>0.6980</b></td><td class="r"><b>0.8145</b></td><td class="r">0.8127</td><td class="r">0.7562</td><td class="r">647</td><td class="r">280</td></tr><tr><td>SVC (RBF)</td><td class="r"><b>0.7033</b></td><td class="r"><b>0.7826</b></td><td class="r">0.7814</td><td class="r">0.7430</td><td class="r">652</td><td class="r">275</td></tr><tr><td>의사결정나무</td><td class="r"><b>0.6613</b></td><td class="r"><b>0.8104</b></td><td class="r">0.8082</td><td class="r">0.7358</td><td class="r">613</td><td class="r">314</td></tr><tr><td>KNN</td><td class="r"><b>0.4984</b></td><td class="r"><b>0.8440</b></td><td class="r">0.8390</td><td class="r">0.6712</td><td class="r">462</td><td class="r">465</td></tr><tr class="hl"><td>모두 “청구” (극단)</td><td class="r">1.0000</td><td class="r">0.0000</td><td class="r">0.0146</td><td class="r">0.5000</td><td class="r">927</td><td class="r">0</td></tr>
+<tr class="hl"><td>모두 “없음” (기준선)</td><td class="r">0.0000</td><td class="r">1.0000</td><td class="r">0.9854</td><td class="r">0.5000</td><td class="r">0</td><td class="r">927</td></tr></tbody></table></div>
+<div class="canvas-box"><canvas id="pair-cv" aria-label="모델별 청구자만 정확도와 미청구자만 정확도 막대"></canvas><div class="tip" id="pair-tip" hidden></div></div>
+<div class="legend"><span><i style="--c:var(--c-claim)"></i>청구자만 정확도 (TPR)</span><span><i style="--c:var(--c-no)"></i>미청구자만 정확도 (TNR)</span></div>
+<div class="say bomi"><div class="av" data-face="surprised" aria-hidden="true"><img src="assets/av_bomi_surprised.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>조교</b><p>“모두 청구”라고 답하면 청구자만 정확도가 100%네요! 그럼 이게 최고 모델…?</p></div></div><div class="say fly"><div class="av" data-face="idea" aria-hidden="true"><img src="assets/av_fly_idea.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>초파리 연구원</b><p>그거 3편 문제 1번이에요. 미리 말하면 재미없으니까 여기까지!</p></div></div></div></div></section><section class="part" id="relation"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">3</div><h2>문항 1의 전체 정확도와의 관계<span class="en">Accuracy = π·TPR + (1−π)·TNR</span></h2><p>임계값과 청구 비율을 바꿔 보세요. π가 작으면 전체 정확도는 TNR에 붙어 다닙니다.</p></div><div class="body"><p>전체 정확도는 두 조건부 정확도의 <b>가중 평균</b>입니다. 가중치는 각 그룹의 비율입니다.</p>
+<p class="card mono" style="font-size:1rem;text-align:center">전체 정확도 = π × TPR + (1 − π) × TNR &nbsp;&nbsp; (π = 청구 비율 = 0.0146)</p>
+<div class="cols"><div class="dial"><label for="th">로지스틱 임계값 <output id="thv"></output></label><input type="range" id="th" min="0" max="96" step="1" value="48"></div>
+<div class="dial"><label for="pi">청구 비율 π (가정) <output id="piv"></output></label><input type="range" id="pi" min="0" max="100" step="1" value="0"></div></div>
+<div class="stat"><div><span class="l">청구자만 정확도 TPR</span><span class="v" id="o-tpr"></span></div><div><span class="l">미청구자만 정확도 TNR</span><span class="v" id="o-tnr"></span></div><div><span class="l">전체 정확도 (π 적용)</span><span class="v" id="o-acc"></span></div><div><span class="l">균형 정확도</span><span class="v" id="o-bal"></span></div></div>
+<p class="mono cap" id="o-formula" aria-live="polite"></p>
+<div class="canvas-box"><canvas id="sweep-cv" aria-label="임계값에 따른 TPR, TNR, 전체 정확도 곡선"></canvas><div class="tip" id="sweep-tip" hidden></div></div>
+<p class="cap" id="sweep-cap"></p></div></div></section><section class="part" id="folds"><div class="wrap"><div class="part-head" style="--kc:var(--data)"><div class="hex">4</div><h2>fold별로 보면<span class="en">Per fold</span></h2><p>청구자만 정확도는 fold마다 크게 흔들립니다.</p></div><div class="body"><div class="tblwrap"><table><thead><tr><th>모델</th><th class="r">TPR fold 1</th><th class="r">2</th><th class="r">3</th><th class="r">4</th><th class="r">5</th><th class="r">TPR 평균 ± 표준편차</th><th class="r">TNR 평균 ± 표준편차</th></tr></thead><tbody><tr><td>로지스틱</td><td class=r>0.7366</td><td class=r>0.7730</td><td class=r>0.6703</td><td class=r>0.7189</td><td class=r>0.6935</td><td class="r"><b>0.7185 ± 0.0395</b></td><td class="r"><b>0.7992 ± 0.0048</b></td></tr><tr><td>선형 SVM</td><td class=r>0.7151</td><td class=r>0.7730</td><td class=r>0.6270</td><td class=r>0.7027</td><td class=r>0.6720</td><td class="r"><b>0.6980 ± 0.0540</b></td><td class="r"><b>0.8145 ± 0.0063</b></td></tr><tr><td>SVC (RBF)</td><td class=r>0.6882</td><td class=r>0.8054</td><td class=r>0.6378</td><td class=r>0.7081</td><td class=r>0.6774</td><td class="r"><b>0.7034 ± 0.0625</b></td><td class="r"><b>0.7826 ± 0.0282</b></td></tr><tr><td>의사결정나무</td><td class=r>0.6935</td><td class=r>0.7730</td><td class=r>0.5243</td><td class=r>0.6649</td><td class=r>0.6505</td><td class="r"><b>0.6612 ± 0.0900</b></td><td class="r"><b>0.8104 ± 0.0282</b></td></tr><tr><td>KNN</td><td class=r>0.5323</td><td class=r>0.4703</td><td class=r>0.4919</td><td class=r>0.4703</td><td class=r>0.5269</td><td class="r"><b>0.4983 ± 0.0299</b></td><td class="r"><b>0.8440 ± 0.0029</b></td></tr></tbody></table></div>
+<p>TPR의 표준편차(0.03~0.09)가 TNR(0.003~0.03)보다 훨씬 큽니다. fold 하나의 청구자는 185명뿐이라, 한 명이 약 0.5%포인트를 움직이기 때문입니다. 이 흔들림이 3편 “문제 3”입니다.</p></div></div></section><section class="part" id="answer"><div class="wrap"><div class="part-head" style="--kc:var(--seq)"><div class="hex">5</div><h2>보고서 답안 틀<span class="en">Answer template</span></h2><p>숫자는 본인 실행 결과로 바꾸세요.</p></div><div class="body"><div class="answer"><span class="tt">✎ 보고서 답안 틀</span><p><b>정의.</b> 청구자만 대상 정확도 = P(Ŷ=1 | Y=1) = TP/(TP+FN) = 재현율(민감도, TPR). 미청구자만 대상 정확도 = P(Ŷ=0 | Y=0) = TN/(TN+FP) = 특이도(TNR).</p>
+<p><b>결과 (로지스틱, 5-Fold 검증 예측, 임계값 0.5).</b> TPR = 666/927 = 0.7184, TNR = 49,872/62,399 = 0.7992.</p>
+<p><b>관계.</b> 전체 정확도 = π·TPR + (1−π)·TNR = 0.0146×0.7184 + 0.9854×0.7992 = 0.7981 (문항 1의 5-Fold 평균 정확도 0.7981과 일치). π가 1.46%로 작아 전체 정확도는 거의 TNR로 정해지며, 청구자 판정 성능(TPR)은 전체 정확도에 1.46%의 가중치로만 반영된다.</p></div></div></div></section><section class="part" id="check"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">6</div><h2>확인 문제<span class="en">Check</span></h2><p>정답을 고르면 해설이 나옵니다.</p></div><div class="body"><div class="q" id="q2-1" data-ok="1" data-ex="조건이 “실제 = 청구”이므로 분모는 실제 청구자 927명입니다. 재현율(TPR)과 같습니다."><p class="qt">Q1. “청구자만 대상 정확도”를 조건부 확률로 쓰면?</p><div class="opts"><button data-i="0" data-why="그것은 정밀도입니다. 조건(세로줄 오른쪽)이 “예측 = 청구”입니다.">P(실제 = 청구 | 예측 = 청구)</button><button data-i="1">P(예측 = 청구 | 실제 = 청구)</button><button data-i="2" data-why="그것은 전체 정확도입니다.">P(예측 = 실제)</button></div><p class="fb" aria-live="polite"></p></div><div class="q" id="q2-2" data-ok="1" data-ex="가중치가 그룹 비율이라, 청구 비율이 작을수록 전체 정확도는 TNR에 가까워집니다."><p class="qt">Q2. 로지스틱의 TPR 0.7184, TNR 0.7992, π 0.0146 일 때 전체 정확도에 가장 가까운 값은?</p><div class="opts"><button data-i="0" data-why="그것은 균형 정확도입니다. 두 그룹의 크기를 같게 본 값입니다.">(0.7184 + 0.7992) ÷ 2 = 0.7588</button><button data-i="1">0.0146 × 0.7184 + 0.9854 × 0.7992 ≈ 0.7981</button><button data-i="2" data-why="곱이 아니라 가중 평균입니다.">0.7184 × 0.7992 ≈ 0.574</button></div><p class="fb" aria-live="polite"></p></div><div class="q" id="q2-3" data-ok="1" data-ex="임계값 슬라이더에서 확인할 수 있습니다. 극단으로 가면 “모두 청구”(TPR 1, TNR 0)가 됩니다."><p class="qt">Q3. 임계값을 낮추면(더 많이 “청구”라고 판정하면) 두 조건부 정확도는?</p><div class="opts"><button data-i="0" data-why="더 많이 청구라고 하면 미청구자를 청구로 잘못 판정하는 일도 늘어 TNR은 내려갑니다.">둘 다 오른다</button><button data-i="1">TPR은 오르고 TNR은 내려간다</button><button data-i="2" data-why="임계값은 혼동행렬 네 칸을 모두 바꿉니다.">둘 다 그대로다</button></div><p class="fb" aria-live="polite"></p></div></div></div></section><section class="part" id="practice"><div class="wrap"><div class="part-head" style="--kc:var(--seq)"><div class="hex">7</div><h2>실무로 잇기<span class="en">From page to Colab</span></h2><p>이 페이지의 숫자를 만든 코드.</p></div><div class="body"><p>e2.py 의 <b>THRESHOLD</b> 를 0.3, 0.5, 0.7 로 바꿔 보세요. f2.py 는 1편 f1.py 가 만든 oof_predictions.csv 를 읽어 다섯 모델과 극단 모델 두 개를 한 표로 냅니다.</p><div class="codebox"><div class="tabs" role="tablist"><button role="tab" data-src="src-e2" data-info="초보용 · 다이얼: THRESHOLD">e2.py</button><button role="tab" data-src="src-f2" data-info="정식 코드 · 먼저 f1.py 실행">f2.py</button><button role="tab" data-src="src-common" data-info="공통 코드">common.py</button></div><div class="tools"><span></span><button class="btn small" data-act="copy">복사</button><button class="btn small" data-act="py">.py 받기</button><button class="btn small" data-act="nb">.ipynb 받기</button></div><pre><code></code></pre></div><script type="text/plain" id="src-e2" data-file="e2.py" data-formal="0">
+# AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 · 2편 초보용 코드 (e2.py)
+# 글 · 안상선 ((주)M-Robo 대표) · CC BY-NC 4.0
+# 규칙: def · for · lambda · 들여쓰기 없음. 맨 위 [다이얼] 몇 줄만 바꿔 다시 실행하세요.
+
+# [다이얼] 판정 임계값 (기본 0.5)
+THRESHOLD = 0.5
+
+# 데이터: 이 저장소에 복사해 둔 원본 (원 출처 fintech-data/Revolution 의 travel insurance.csv 와 같은 파일)
+DATA_URL = 'https://raw.githubusercontent.com/adminmrobo/ai-biz-insurtech-02/main/data/travel_insurance.csv'
+# 저장소 주소가 열리지 않으면 아래 줄의 # 를 지우고 원 출처에서 읽으세요
+# DATA_URL = 'https://raw.githubusercontent.com/fintech-data/Revolution/main/data/travel%20insurance.csv'
+
+import pandas as pd
+import numpy as np
+pd.set_option("display.width", 200)
+pd.set_option("display.max_columns", 20)
+
+# ① 데이터 읽기 + 정리 규칙 (인슈어테크_01 2편과 같음 · 행 삭제 없음 · 증강 없음)
+raw = pd.read_csv(DATA_URL)
+raw = raw.rename(columns={'Agency Type': 'Agency_Type', 'Distribution Channel': 'Distribution_Channel', 'Product Name': 'Product_Name', 'Net Sales': 'Net_Sales', 'Commision (in value)': 'Commision_in_value'})
+df = raw.copy()
+df['Gender'] = df['Gender'].fillna('Unknown')
+df['Duration'] = df['Duration'].mask(df['Duration'] <= 0, df.loc[df['Duration'] > 0, 'Duration'].median()).clip(upper=731)
+df['Age'] = df['Age'].mask(df['Age'] > 100, df.loc[df['Age'] <= 100, 'Age'].median())
+df['Net_Sales'] = df['Net_Sales'].clip(df['Net_Sales'].quantile(0.001), df['Net_Sales'].quantile(0.999))
+df['Commision_in_value'] = df['Commision_in_value'].clip(upper=df['Commision_in_value'].quantile(0.999))
+top10 = df['Destination'].value_counts().index[:10]
+df['Destination'] = df['Destination'].where(df['Destination'].isin(top10), 'OTHER')
+y = (df['Claim'] == 'Yes').astype(int)
+X = pd.get_dummies(df.drop(columns='Claim'), drop_first=True, dtype=int)
+
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold, cross_val_predict
+
+# ② 5-Fold 검증 확률 (각 고객은 자기를 학습에 쓰지 않은 모델이 판정)
+logistic = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight='balanced', random_state=42))
+proba = cross_val_predict(logistic, X, y, cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=42), method='predict_proba')[:, 1]
+pred = (proba >= THRESHOLD).astype(int)
+
+# ③ 청구자만 정확도 = P(예측 청구 | 실제 청구) = 재현율(TPR)
+tpr = (pred[y == 1] == 1).mean()
+# ④ 미청구자만 정확도 = P(예측 없음 | 실제 없음) = 특이도(TNR)
+tnr = (pred[y == 0] == 0).mean()
+# ⑤ 전체 정확도 = π × TPR + (1 − π) × TNR
+pi = y.mean()
+print('TPR (claim only):', round(tpr, 4), '| TNR (no-claim only):', round(tnr, 4))
+print('overall accuracy:', round((pred == y).mean(), 4), '| pi*TPR + (1-pi)*TNR:', round(pi * tpr + (1 - pi) * tnr, 4), '| pi:', round(pi, 5))
+print('balanced accuracy (TPR+TNR)/2:', round((tpr + tnr) / 2, 4))
+</script><script type="text/plain" id="src-f2" data-file="f2.py" data-formal="0">
+"""
+AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 · 2편 정식 코드 (f2.py)
+글 · 안상선 ((주)M-Robo 대표) · CC BY-NC 4.0
+
+과제 문항 2: 실제 청구자(Claim=Yes)만 / 미청구자(Claim=No)만 대상으로 한 정확도
+ ① 1편(f1.py)이 저장한 5-Fold 검증 예측 oof_predictions.csv 를 읽는다 (먼저 f1.py 실행)
+ ② 청구자만 정확도  = P(예측=청구 | 실제=청구)  = 재현율 = 민감도(TPR)
+    미청구자만 정확도 = P(예측=없음 | 실제=없음) = 특이도(TNR)
+ ③ 전체 정확도 = π × TPR + (1 − π) × TNR  (π = 청구 비율) 가 성립하는지 숫자로 확인
+ ④ fold 별 값과 평균 ± 표준편차, 극단 모델(모두 청구 / 모두 없음)과 비교
+"""
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold
+
+oof = pd.read_csv('oof_predictions.csv')
+y = oof['y'].to_numpy()
+pi = y.mean()
+models = [c[5:] for c in oof.columns if c.startswith('pred_')]
+preds = {m: oof[f'pred_{m}'].to_numpy() for m in models}
+preds['All Yes (모두 청구)'] = np.ones_like(y)
+preds['All No (모두 없음)'] = np.zeros_like(y)
+
+rows = []
+for m, p in preds.items():
+    tpr = (p[y == 1] == 1).mean()
+    tnr = (p[y == 0] == 0).mean()
+    acc = (p == y).mean()
+    rows.append({'model': m, 'acc_claim_only(TPR)': tpr, 'acc_noclaim_only(TNR)': tnr, 'overall_acc': acc,
+                 'pi*TPR+(1-pi)*TNR': pi * tpr + (1 - pi) * tnr, 'balanced_acc': (tpr + tnr) / 2,
+                 'caught': int(p[y == 1].sum()), 'missed': int((p[y == 1] == 0).sum()), 'false_alarm': int(p[y == 0].sum())})
+print(f'pi (claim rate) = {pi:.5f}  claims = {int(y.sum())}  no-claims = {int((y == 0).sum())}')
+print(pd.DataFrame(rows).round(4).to_string(index=False))
+
+# fold 별 (1편과 같은 나누기)
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+fr = []
+for k, (_, va) in enumerate(skf.split(np.zeros(len(y)), y), 1):
+    for m in models:
+        p, t = preds[m][va], y[va]
+        fr.append({'model': m, 'fold': k, 'TPR': (p[t == 1] == 1).mean(), 'TNR': (p[t == 0] == 0).mean()})
+fr = pd.DataFrame(fr)
+for col in ['TPR', 'TNR']:
+    t = fr.pivot(index='model', columns='fold', values=col)
+    t['mean'], t['std'] = t.mean(axis=1), t.std(axis=1, ddof=1)
+    print(f'\n[{col}] fold 1~5, mean, std')
+    print(t.round(4).to_string())
+</script><script type="text/plain" id="src-common" data-file="common.py" data-formal="0">
+"""
+AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 · 공통 코드 (common.py)
+글 · 안상선 ((주)M-Robo 대표) · CC BY-NC 4.0
+
+하는 일
+ ① 여행자보험 데이터 읽기 (공개 학습용 데이터, 63,326건)
+    - 이 저장소의 data/travel_insurance.csv 를 먼저 읽고, 없으면 저장소 주소 → 원 출처 주소 순으로 읽는다
+ ② 결측값 · 이상치를 업무 기준으로 고치기 (2편)
+ ③ 범주형 원-핫 인코딩, 종속변수 Claim -> 0/1
+ ④ 미리 정한 학습/시험 나누기 (층화 80:20, random_state=42 -> data/split.csv 와 같음)
+ ⑤ 기준선: "모두 청구 없음"으로만 답하기
+
+원칙: 데이터 증강(SMOTE 등 합성 데이터 생성)은 쓰지 않는다. 원본 행만 쓴다.
+"""
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+# 원 출처: https://raw.githubusercontent.com/fintech-data/Revolution/main/data/travel%20insurance.csv
+# 이 저장소에는 같은 파일을 data/travel_insurance.csv 로 복사해 두었다 (내용 동일, 파일 이름의 공백만 밑줄로)
+DATA_URL = "https://raw.githubusercontent.com/adminmrobo/ai-biz-insurtech-02/main/data/travel_insurance.csv"
+SOURCE_URL = "https://raw.githubusercontent.com/fintech-data/Revolution/main/data/travel%20insurance.csv"
+LOCAL_PATHS = ['data/travel_insurance.csv', '../data/travel_insurance.csv', 'travel_insurance.csv']
+SEED = 42
+
+RENAME = {'Agency Type': 'Agency_Type', 'Distribution Channel': 'Distribution_Channel',
+          'Product Name': 'Product_Name', 'Net Sales': 'Net_Sales',
+          'Commision (in value)': 'Commision_in_value'}
+NUM_COLS = ['Duration', 'Net_Sales', 'Commision_in_value', 'Age']
+CAT_COLS = ['Agency', 'Agency_Type', 'Distribution_Channel', 'Product_Name', 'Destination', 'Gender']
+
+
+def load_raw(path=None):
+    """① 원본 데이터 읽기 (열 이름의 공백·괄호를 밑줄로).
+    path 를 주지 않으면: 저장소 안 파일 → 저장소 주소 → 원 출처 주소 순서로 시도한다."""
+    import os
+    candidates = [path] if path else [p for p in LOCAL_PATHS if os.path.exists(p)] + [DATA_URL, SOURCE_URL]
+    last = None
+    for c in candidates:
+        try:
+            return pd.read_csv(c).rename(columns=RENAME)
+        except Exception as e:  # 주소가 아직 없거나 네트워크 오류면 다음 후보로
+            last = e
+    raise last
+
+
+def clean(df):
+    """② 결측값 · 이상치를 업무 기준으로 고친다. 행은 하나도 지우지 않는다.
+
+    - Gender 결측(약 71%) -> 'Unknown' 범주
+    - Duration 0 이하 -> 정상값(>0)의 중앙값, 731일(2년) 초과 -> 731
+    - Age 100 초과(118세 984건 등) -> 정상 나이(<=100)의 중앙값
+    - Net_Sales 상·하위 0.1%, Commision 상위 0.1% -> 경계값으로 고정(윈저라이징)
+    - Destination 149개국 -> 상위 10개국 + OTHER
+    """
+    df = df.copy()
+    df['Gender'] = df['Gender'].fillna('Unknown').replace('None', 'Unknown')
+    dur_med = df.loc[df['Duration'] > 0, 'Duration'].median()
+    df['Duration'] = df['Duration'].mask(df['Duration'] <= 0, dur_med).clip(upper=731)
+    age_med = df.loc[df['Age'] <= 100, 'Age'].median()
+    df['Age'] = df['Age'].mask(df['Age'] > 100, age_med)
+    lo, hi = df['Net_Sales'].quantile(0.001), df['Net_Sales'].quantile(0.999)
+    df['Net_Sales'] = df['Net_Sales'].clip(lo, hi)
+    c_hi = df['Commision_in_value'].quantile(0.999)
+    df['Commision_in_value'] = df['Commision_in_value'].clip(upper=c_hi)
+    top10 = df['Destination'].value_counts().index[:10]
+    df['Destination'] = df['Destination'].where(df['Destination'].isin(top10), 'OTHER')
+    info = {'duration_median': dur_med, 'age_median': age_med, 'net_low': lo, 'net_high': hi,
+            'comm_high': c_hi, 'top10_destinations': list(top10)}
+    return df, info
+
+
+def encode(df):
+    """③ X(원-핫) 와 y(청구=1) 만들기."""
+    y = (df['Claim'] == 'Yes').astype(int)
+    X = pd.get_dummies(df.drop(columns='Claim'), drop_first=True, dtype=int)
+    return X, y
+
+
+def split_index(y):
+    """④ 미리 정한 나누기: 행 번호 기준 층화 80:20 (data/split.csv 와 같은 결과)."""
+    idx = np.arange(len(y))
+    tr, te = train_test_split(idx, test_size=0.2, stratify=y, random_state=SEED)
+    return tr, te   # 순서도 노트북의 train_test_split 결과와 같게 유지
+
+
+def load_all(path=None):
+    """①~④ 한 번에: 정리된 df, X, y, 학습/시험 행 번호, 처리 정보."""
+    raw = load_raw(path)
+    df, info = clean(raw)
+    X, y = encode(df)
+    tr, te = split_index(y)
+    return raw, df, X, y, tr, te, info
+
+
+def baseline(y_true):
+    """⑤ 기준선: 모두 '청구 없음'으로 답할 때의 정확도와 재현율."""
+    acc = float((y_true == 0).mean())
+    return {'accuracy': acc, 'recall': 0.0}
+</script>
+<details class="run"><summary>실행 결과 보기 (정식 코드 f2.py 를 실제로 실행한 출력)</summary><pre>pi (claim rate) = 0.01464  claims = 927  no-claims = 62399
+          model  acc_claim_only(TPR)  acc_noclaim_only(TNR)  overall_acc  pi*TPR+(1-pi)*TNR  balanced_acc  caught  missed  false_alarm
+            KNN               0.4984                 0.8440       0.8390             0.8390        0.6712     462     465         9732
+      SVC (RBF)               0.7033                 0.7826       0.7814             0.7814        0.7430     652     275        13568
+     Linear SVM               0.6980                 0.8145       0.8127             0.8127        0.7562     647     280        11578
+       Logistic               0.7184                 0.7992       0.7981             0.7981        0.7588     666     261        12527
+  Decision Tree               0.6613                 0.8104       0.8082             0.8082        0.7358     613     314        11832
+All Yes (모두 청구)               1.0000                 0.0000       0.0146             0.0146        0.5000     927       0        62399
+ All No (모두 없음)               0.0000                 1.0000       0.9854             0.9854        0.5000       0     927            0
+
+[TPR] fold 1~5, mean, std
+fold                1       2       3       4       5    mean     std
+model                                                                
+Decision Tree  0.6935  0.7730  0.5243  0.6649  0.6505  0.6612  0.0900
+KNN            0.5323  0.4703  0.4919  0.4703  0.5269  0.4983  0.0299
+Linear SVM     0.7151  0.7730  0.6270  0.7027  0.6720  0.6980  0.0540
+Logistic       0.7366  0.7730  0.6703  0.7189  0.6935  0.7185  0.0395
+SVC (RBF)      0.6882  0.8054  0.6378  0.7081  0.6774  0.7034  0.0625
+
+[TNR] fold 1~5, mean, std
+fold                1       2       3       4       5    mean     std
+model                                                                
+Decision Tree  0.8228  0.7631  0.8380  0.8130  0.8151  0.8104  0.0282
+KNN            0.8460  0.8450  0.8389  0.8458  0.8445  0.8440  0.0029
+Linear SVM     0.8090  0.8064  0.8208  0.8178  0.8183  0.8145  0.0063
+Logistic       0.7963  0.7929  0.7992  0.8033  0.8046  0.7992  0.0048
+SVC (RBF)      0.7878  0.7365  0.8029  0.7786  0.8070  0.7826  0.0282</pre></details></div></div></section><section class="part" id="prompt"><div class="wrap"><div class="part-head" style="--kc:var(--seq)"><div class="hex">✦</div><h2>AI와 함께 더 공부하기<span class="en">AI tutor prompt</span></h2><p>ChatGPT·Claude·Gemini 등에 그대로 붙여 넣으세요. [ ] 안만 바꾸면 됩니다.</p></div><div class="body"><div class="prompt"><pre id="prompt-2"># 역할
+당신은 보험 데이터 분석 과제를 돕는 튜터입니다. 저는 「AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전」 2편 「청구자만, 미청구자만 맞힌 비율」을 따라 하며 과제 문항 2을 풀고 있습니다.
+정답을 대신 써 주지 말고, 제가 직접 실행하고 이해할 수 있게 도와 주세요.
+
+# 배경
+- 데이터: 여행자보험 63,326건 (data/travel_insurance.csv, 원 출처 fintech-data/Revolution)
+- 열: Agency · Agency Type · Distribution Channel · Product Name · Duration(보험 기간) · Destination(여행 국가) · Net Sales(순매출) · Commision (in value)(수수료) · Gender(71% 결측) · Age · Claim(Yes/No = 맞힐 대상)
+- 청구(Claim=Yes) 927건(1.46%), 약 1 : 67 의 극단적 불균형
+- 내 수준: [예: 파이썬 조금, 통계 처음]
+
+# 해 줄 일
+1. cross_val_predict 로 5-Fold 검증 예측을 만들어 주세요.
+2. 청구자만 정확도와 미청구자만 정확도를 조건부 확률로 정의하고 계산해 주세요.
+3. 전체 정확도 = π·TPR + (1−π)·TNR 이 맞는지 제 숫자로 확인해 주세요.
+4. 임계값 [0.5] 를 바꿀 때 세 값이 어떻게 움직이는지 표로 보여 주세요.
+
+# 반드시 지킬 것 (과제 제약)
+- 데이터 증강 금지: SMOTE · ADASYN · 오버샘플링 · 합성 데이터 · 단순 복제 모두 쓰지 않기. 불균형은 class_weight 와 임계값으로만
+- StratifiedKFold(n_splits=5, shuffle=True, random_state=42) 사용, fold 별 점수 5개 + 평균 ± 표준편차
+- 전처리(표준화 등)는 Pipeline 안에서 fold 학습 데이터로만 fit (누수 금지)
+- 임계값은 학습 데이터의 교차검증 확률로만 결정, 시험 데이터로 고르지 않기
+- Accuracy 만 보고하지 않기: Precision · Recall · F1 · ROC-AUC 함께
+- 실행하지 않은 숫자를 지어내지 말고, 내가 실행해서 채울 수 있는 빈 표로 주기
+- 내가 바꿀 줄에는 # [변경] 주석
+
+# 답변 형식
+1) 한 문단 요약  2) 단계별 설명(비유 하나)  3) Colab 코드  4) 결과 읽는 법  5) 내가 스스로 확인할 질문 2개</pre></div><div class="btns"><button class="btn small" data-copy="prompt-2">프롬프트 복사</button><button class="btn small" data-save="prompt-2" data-name="ai_prompt_2.txt">.txt 받기</button></div></div></div></section><section class="part" id="glossary"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">?</div><h2>용어 사전<span class="en">Glossary</span></h2><p>비유로 먼저, 뜻은 그다음.</p></div><div class="body"><dl class="gloss"><div><dt>조건부 확률</dt><dd><i>“~인 사람들 중에서”.</i> P(A | B) = B인 경우만 놓고 A의 비율. 세로줄 오른쪽이 분모.</dd></div><div><dt>재현율 · 민감도 (TPR)</dt><dd><i>청구자 그물.</i> P(예측=청구 | 실제=청구).</dd></div><div><dt>특이도 (TNR)</dt><dd><i>미청구자를 미청구로.</i> P(예측=없음 | 실제=없음).</dd></div><div><dt>정밀도 (Precision)</dt><dd><i>그물 속 순도.</i> P(실제=청구 | 예측=청구). 조건이 뒤집힌 값.</dd></div><div><dt>기저율 π</dt><dd><i>원래 비율.</i> 전체 중 청구 비율 0.0146.</dd></div><div><dt>균형 정확도</dt><dd><i>두 그룹을 같은 무게로.</i> (TPR + TNR) ÷ 2. 불균형에서 정확도 대신 쓴다.</dd></div></dl></div></div></section><section class="part" id="author-sec"><div class="wrap"><div class="body"><a class="teach-link" href="answers.html#a2">강사·튜터라면 → 교육자용 정답 (2편): 정답 · 채점 기준 · 강의 멘트</a>
+<div class="card"><h3>글 · 안상선 ((주)M-Robo 대표)</h3><p class="cap">(주)M-Robo 대표. 금융·보험 데이터와 AI를 현장에서 쓰는 방법을, 버튼만 눌러 따라 할 수 있는 교재로 만듭니다.</p></div></div></div></section><section class="outro" id="outro"><div class="wrap"><div class="body"><h2>수고하셨습니다!</h2>
+<img class="scene" src="assets/s2.webp" alt="좁은 호박색 문과 넓은 하늘색 문, 문마다 따로 달린 게이지" width="1440" height="800" loading="lazy">
+<div class="chat"><div class="say actuary"><div class="av" data-face="explain" aria-hidden="true"><img src="assets/av_actuary_explain.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>박사<span class="npc" title="NPC">NPC</span></b><ul><li>청구자만 정확도 = P(예측 청구 | 실제 청구) = 재현율(TPR)</li><li>미청구자만 정확도 = P(예측 없음 | 실제 없음) = 특이도(TNR)</li><li>전체 정확도 = π·TPR + (1−π)·TNR. π가 1.46%라 거의 TNR</li></ul></div></div><div class="say bomi"><div class="av" data-face="proud" aria-hidden="true"><img src="assets/av_bomi_proud.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>조교</b><p>분모를 먼저 적으니까 헷갈리던 숫자들이 정리됐어요.</p></div></div><div class="say fly"><div class="av" data-face="idea" aria-hidden="true"><img src="assets/av_fly_idea.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>초파리 연구원</b><p>그런데 “청구자만 정확도 72%”를 그대로 성능이라고 써도 돼요? 모두 청구라고 하면 100%던데…</p></div></div></div>
+<div class="nav-eps"><a class="btn" href="1_kfold_cv.html">← 이전 편: 증강 없이 5-Fold로 성능 재기</a><a class="btn" href="index.html">처음 화면</a><a class="btn primary" href="3_problems_fixes.html">다음 편: 그 숫자를 성능이라 부르면 생기는 일 →</a></div></div></div></section><footer><div class="wrap"><p><b>청구자만, 미청구자만 맞힌 비율</b> · AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전</p><p>글 · 안상선 ((주)M-Robo 대표)</p>
+<p><b>설명용 모형인 것:</b> 이 시리즈는 공개 학습용 여행자보험 데이터(63,326건, 원 출처 fintech-data/Revolution 의 travel insurance.csv 를 이 저장소 data/travel_insurance.csv 로 복사)를 그대로 씁니다. 가상 데이터를 만들거나 데이터를 증강하지 않습니다. 브라우저 실습은 교육용 구현이라 정식 코드와 숫자가 조금 다를 수 있으며, 다른 경우 그 자리에 밝힙니다. </p><p><b>주의:</b> 교육용 예시이며 보험 가입·보험료·보상에 대한 조언이 아닙니다. 실제 보험 심사와 보험료 산정은 감독 규정과 계리 기준을 따릅니다. 특정 집단에 불리한 특성(예: 성별·나이)의 사용은 금지되거나 제한될 수 있습니다.</p>
+<p><b>데이터:</b> 공개 학습용 Travel Insurance 데이터 · 저장소 사본 <a href="data/travel_insurance.csv">data/travel_insurance.csv</a> (원 출처 <a href="https://raw.githubusercontent.com/fintech-data/Revolution/main/data/travel%20insurance.csv">fintech-data/Revolution</a>) · 학습/시험 나누기 <a href="data/split.csv">data/split.csv</a> · 앞 시리즈 <a href="https://adminmrobo.github.io/ai-biz-insurtech-01/">인슈어테크_01 분류모델</a></p>
+<p><b>참고:</b> scikit-learn User Guide (Nearest Neighbors, SVM, Linear Models, Decision Trees, Model evaluation) · 플레이북 「인터랙티브 교육 HTML 시리즈 제작 플레이북 v3」</p>
+<p><a href="https://creativecommons.org/licenses/by-nc/4.0/deed.ko">CC BY-NC 4.0</a> — 출처 표기 예: “AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전, 글 · 안상선 ((주)M-Robo 대표), CC BY-NC 4.0”</p></div></footer>
+<p id="lang-note" class="note" hidden style="position:fixed;bottom:12px;left:12px;right:12px;z-index:30"></p>
+<script>const SITE="https://adminmrobo.github.io/ai-biz-insurtech-02/";
+// ---------- 공통: 테마 색 읽기 ----------
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+const REDRAW=[];function onTheme(f){REDRAW.push(f)}
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>REDRAW.forEach(f=>f()))}catch(e){}
+new MutationObserver(()=>REDRAW.forEach(f=>f())).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+// 캔버스 준비 (선명하게)
+function prep(cv,h){const r=cv.getBoundingClientRect();const w=Math.max(200,r.width||cv.parentNode.clientWidth||600);const d=window.devicePixelRatio||1;cv.width=w*d;cv.height=h*d;cv.style.height=h+'px';const c=cv.getContext('2d');c.setTransform(d,0,0,d,0,0);return {c,w,h}}
+let RZ;addEventListener('resize',()=>{clearTimeout(RZ);RZ=setTimeout(()=>REDRAW.forEach(f=>f()),150)});
+const fmtP=(x,d=1)=>(x*100).toFixed(d)+'%';
+const nf=n=>Number(n).toLocaleString('en-US');
+// ---------- 확인 문제 ----------
+document.querySelectorAll('.q').forEach(q=>{const ok=q.dataset.ok,fb=q.querySelector('.fb');q.querySelectorAll('.opts button').forEach(b=>b.addEventListener('click',()=>{
+ q.querySelectorAll('.opts button').forEach(x=>x.classList.remove('right','wrong'));
+ if(b.dataset.i===ok){b.classList.add('right');fb.innerHTML='<b>정답입니다.</b> '+q.dataset.ex}else{b.classList.add('wrong');fb.innerHTML='<b>다시 생각해 보세요.</b> '+(b.dataset.why||'')}}))});
+// ---------- 복사 · 내려받기 ----------
+function copyTxt(t,btn){const o=btn.textContent;const done=()=>{btn.textContent='복사됨';setTimeout(()=>btn.textContent=o,1300)};try{navigator.clipboard.writeText(t).then(done,()=>{btn.textContent='직접 선택해 복사하세요'})}catch(e){btn.textContent='직접 선택해 복사하세요'}}
+function saveFile(name,text,type){try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type||'text/plain'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}catch(e){}}
+function toIpynb(src,formal){const lines=src.split('\n');const cells=[];let cur=[];
+ lines.forEach(l=>{if(/^# [①-⑳]/.test(l)&&cur.join('').trim()){cells.push(cur);cur=[]}cur.push(l)});if(cur.join('').trim())cells.push(cur);
+ const mk=a=>{while(a.length&&!a[a.length-1].trim())a.pop();return {cell_type:'code',metadata:{},execution_count:null,outputs:[],source:a.map((l,i)=>i<a.length-1?l+'\n':l)}};
+ const out=cells.map(mk).filter(c=>c.source.join('').trim());
+ if(formal)out.unshift(mk(['# 공통 코드 내려받기 (Colab)','!wget -q -O common.py '+SITE+'code/common.py']));
+ return JSON.stringify({cells:out,metadata:{kernelspec:{name:'python3',display_name:'Python 3'},language_info:{name:'python'}},nbformat:4,nbformat_minor:5},null,1)}
+document.querySelectorAll('.codebox').forEach(box=>{const tabs=[...box.querySelectorAll('.tabs button')];const pre=box.querySelector('pre code');const info=box.querySelector('.tools span');
+ let curId=null;function show(b){tabs.forEach(t=>t.setAttribute('aria-selected',t===b?'true':'false'));curId=b.dataset.src;const s=document.getElementById(curId);pre.textContent=s.textContent.replace(/^\n/,'');info.textContent=b.dataset.info||''}
+ tabs.forEach(t=>t.addEventListener('click',()=>show(t)));if(tabs[0])show(tabs[0]);
+ box.querySelector('[data-act=copy]').addEventListener('click',e=>copyTxt(pre.textContent,e.currentTarget));
+ box.querySelector('[data-act=py]').addEventListener('click',()=>{const s=document.getElementById(curId);saveFile(s.dataset.file,pre.textContent,'text/x-python')});
+ box.querySelector('[data-act=nb]').addEventListener('click',()=>{const s=document.getElementById(curId);saveFile(s.dataset.file.replace(/\.py$/,'.ipynb'),toIpynb(pre.textContent,s.dataset.formal==='1'),'application/json')})});
+document.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',e=>copyTxt(document.getElementById(b.dataset.copy).textContent,e.currentTarget)));
+document.querySelectorAll('[data-save]').forEach(b=>b.addEventListener('click',()=>saveFile(b.dataset.name,document.getElementById(b.dataset.save).textContent)));
+// ---------- 상태 캐릭터 ----------
+function robo(id,st){const w=document.getElementById(id);if(!w||w.dataset.st===st)return;w.dataset.st=st;w.querySelectorAll('[data-rs]').forEach(e=>e.hidden=e.dataset.rs!==st)}
+// ---------- 식구 카드: 모습 바꾸기 ----------
+document.querySelectorAll('.crew .moods button').forEach(b=>b.addEventListener('click',()=>{const card=b.closest('.crew');
+ card.querySelectorAll('.moods button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+ card.querySelectorAll('.cf').forEach(f=>f.classList.toggle('on',f.dataset.face===b.dataset.fb))}));
+// ---------- 막대 (기준선 포함) ----------
+function setBar(el,v,base){el.querySelector('.fill').style.width=Math.max(0,Math.min(1,v))*100+'%';const bl=el.querySelector('.base');if(bl){if(base==null)bl.hidden=true;else{bl.hidden=false;bl.style.left='calc('+base*100+'% - 1px)'}}el.querySelector('.v').textContent=fmtP(v)}
+// ---------- 혼동행렬 ----------
+function cmHTML(m){return `<div></div><div class="h">판정: 청구 없음</div><div class="h">판정: 청구 위험</div>
+ <div class="h rh">실제 미청구</div><div class="c ok"><b>${nf(m.tn)}</b><span>정상 통과</span></div><div class="c"><b>${nf(m.fp)}</b><span>추가 심사 (오탐)</span></div>
+ <div class="h rh">실제 청구</div><div class="c bad"><b>${nf(m.fn)}</b><span>⚠ 놓친 청구</span></div><div class="c ok"><b>${nf(m.tp)}</b><span>찾은 청구</span></div>`}
+
+const D={"sw":{"th":[0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.11,0.12,0.13,0.14,0.15,0.16,0.17,0.18,0.19,0.2,0.21,0.22,0.23,0.24,0.25,0.26,0.27,0.28,0.29,0.3,0.31,0.32,0.33,0.34,0.35,0.36,0.37,0.38,0.39,0.4,0.41,0.42,0.43,0.44,0.45,0.46,0.47,0.48,0.49,0.5,0.51,0.52,0.53,0.54,0.55,0.56,0.57,0.58,0.59,0.6,0.61,0.62,0.63,0.64,0.65,0.66,0.67,0.68,0.69,0.7,0.71,0.72,0.73,0.74,0.75,0.76,0.77,0.78,0.79,0.8,0.81,0.82,0.83,0.84,0.85,0.86,0.87,0.88,0.89,0.9,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98],"tpr":[0.9913700107874865,0.9913700107874865,0.9892125134843581,0.9859762675296656,0.9859762675296656,0.9848975188781014,0.982740021574973,0.9805825242718447,0.9773462783171522,0.9741100323624595,0.970873786407767,0.9654800431499461,0.9579288025889967,0.9471413160733549,0.9428263214670982,0.9363538295577131,0.9352750809061489,0.9277238403451996,0.9234088457389428,0.9212513484358145,0.918015102481122,0.9147788565264293,0.9104638619201726,0.9083063646170443,0.9007551240560949,0.8964401294498382,0.8867313915857605,0.8781014023732471,0.8705501618122977,0.866235167206041,0.86084142394822,0.8543689320388349,0.8500539374325782,0.8457389428263214,0.8414239482200647,0.8338727076591155,0.8284789644012945,0.8209277238403452,0.8133764832793959,0.8058252427184466,0.7918015102481122,0.7820927723840345,0.7713052858683926,0.7637540453074434,0.7518878101402373,0.7400215749730313,0.7292340884573895,0.7238403451995685,0.7184466019417476,0.7076591154261057,0.7011866235167206,0.6947141316073355,0.6893203883495146,0.686084142394822,0.6785329018338727,0.6720604099244876,0.668824163969795,0.6645091693635383,0.6601941747572816,0.6548004314994607,0.651564185544768,0.6429341963322546,0.6375404530744336,0.6332254584681769,0.6299892125134844,0.6267529665587918,0.6256742179072277,0.6202804746494067,0.6170442286947141,0.6094929881337648,0.6019417475728155,0.5900755124056095,0.5782092772384034,0.5609492988133765,0.535059331175836,0.4929881337648328,0.4563106796116505,0.42071197411003236,0.3948220064724919,0.3516720604099245,0.3344120819848975,0.30852211434735705,0.2815533980582524,0.24487594390507011,0.22330097087378642,0.19525350593311758,0.17475728155339806,0.1499460625674218,0.11974110032362459,0.09816612729234088,0.06903991370010787,0.040992448759439054,0.032362459546925564,0.014023732470334413,0.009708737864077669,0.008629989212513484,0.004314994606256742],"tnr":[0.012307889549512011,0.01568935399605763,0.020577252840590393,0.036987772239939744,0.057132325838555105,0.07915190948572894,0.10490552733216879,0.12612381608679626,0.14355999294860494,0.16061154826199137,0.18378499655443195,0.21301623423452298,0.2413500216349621,0.2674081315405696,0.2906456834244138,0.31394733889966187,0.3357746117726246,0.35822689466177343,0.3814163688520649,0.4041571179025305,0.4230837032644754,0.44273145402971203,0.46340486225740796,0.48606548181861886,0.5071715892882899,0.5257936825910672,0.5433099889421305,0.5575409862337537,0.5706501706758121,0.583198448693088,0.5939358002532091,0.6068045962275036,0.6180227247231526,0.6303306142726647,0.6427186333114313,0.6584720908988926,0.6738890046314845,0.6880078206381512,0.7012612381608679,0.7144826038878829,0.7257007323835318,0.7368066795942243,0.7473837721758362,0.756406352665908,0.7659257359893588,0.7752688344364493,0.784147181845863,0.7920800012820718,0.7992435776214363,0.8053654706004904,0.810734146380551,0.8159425631821022,0.820622125354573,0.8252055321399382,0.829404317376881,0.8335389990224202,0.83733713681309,0.840638471770381,0.8440519880126284,0.8467443388515842,0.8497091299540057,0.852705972852129,0.8568566803955192,0.85929261686886,0.8611035433260148,0.8631388323530825,0.8649337329123864,0.867001073735156,0.8694049584127951,0.8719210243753907,0.875350566515489,0.879308963284668,0.8840686549463934,0.8909758169201429,0.8996939053510473,0.9109120338466963,0.9212006602669914,0.9309283802625042,0.9389092773922659,0.9460408019359284,0.9522428244042372,0.9578518886520617,0.9626436321094889,0.9670828058141957,0.9710572284812257,0.9746630554976843,0.9786214522668633,0.9829644705844645,0.9874997996762769,0.9902402282087854,0.9928203977627846,0.9956089039888459,0.9970352088975785,0.9980608663600378,0.9985576691934166,0.9988781871504351,0.9993108863924102]},"pi":0.014638537093768752,"FM":{"lr":[{"acc":0.7954366019264172,"prec":0.0511384845091452,"rec":0.7365591397849462,"f1":0.09563699825479931,"auc":0.839013173766198,"tnr":0.7963141025641025,"tp":137,"fn":49,"fp":2542,"tn":9938},{"acc":0.7925779707856296,"prec":0.05241935483870968,"rec":0.772972972972973,"f1":0.09818056985925164,"auc":0.8537198977823979,"tnr":0.7928685897435898,"tp":143,"fn":42,"fp":2585,"tn":9895},{"acc":0.7973154362416107,"prec":0.04714828897338403,"rec":0.6702702702702703,"f1":0.0880994671403197,"auc":0.7881314968814969,"tnr":0.799198717948718,"tp":124,"fn":61,"fp":2506,"tn":9974},{"acc":0.8020529016975918,"prec":0.051391035548686244,"rec":0.7189189189189189,"f1":0.09592499098449332,"auc":0.8247438063063064,"tnr":0.8032852564102564,"tp":133,"fn":52,"fp":2455,"tn":10025},{"acc":0.8029214370311883,"prec":0.05023364485981308,"rec":0.6935483870967742,"f1":0.09368191721132899,"auc":0.8037220810531587,"tnr":0.8045516467665679,"tp":129,"fn":57,"fp":2439,"tn":10040}],"lsvm":[{"acc":0.8075951365861361,"prec":0.052840683353198255,"rec":0.7150537634408602,"f1":0.09840917499075102,"auc":0.8401970033774468,"tnr":0.808974358974359,"tp":133,"fn":53,"fp":2384,"tn":10096},{"acc":0.8059218318199763,"prec":0.055881203595154354,"rec":0.772972972972973,"f1":0.1042274052478134,"auc":0.8527891112266112,"tnr":0.8064102564102564,"tp":143,"fn":42,"fp":2416,"tn":10064},{"acc":0.818002368732728,"prec":0.04931972789115646,"rec":0.6270270270270271,"f1":0.09144659046117462,"auc":0.7864163201663201,"tnr":0.8208333333333333,"tp":116,"fn":69,"fp":2236,"tn":10244},{"acc":0.8161073825503355,"prec":0.054076539101497505,"rec":0.7027027027027027,"f1":0.10042487446890692,"auc":0.8252661555786556,"tnr":0.8177884615384615,"tp":130,"fn":55,"fp":2274,"tn":10206},{"acc":0.8161073825503355,"prec":0.05223568742164647,"rec":0.6720430107526881,"f1":0.09693679720822024,"auc":0.8033050363320056,"tnr":0.8182546678419745,"tp":125,"fn":61,"fp":2268,"tn":10211}],"svc":[{"acc":0.7863571766935101,"prec":0.04610951008645533,"rec":0.6881720430107527,"f1":0.08642808912896689,"auc":0.7859540856768679,"tnr":0.7878205128205128,"tp":128,"fn":58,"fp":2648,"tn":9832},{"acc":0.7374654559810502,"prec":0.0433391506689936,"rec":0.8054054054054054,"f1":0.08225227711841016,"auc":0.8103380544005543,"tnr":0.7364583333333333,"tp":149,"fn":36,"fp":3289,"tn":9191},{"acc":0.8004737465455981,"prec":0.045771916214119475,"rec":0.6378378378378379,"f1":0.08541440463264569,"auc":0.7682610013860014,"tnr":0.8028846153846154,"tp":118,"fn":67,"fp":2460,"tn":10020},{"acc":0.7775759968416897,"prec":0.045266067726330336,"rec":0.7081081081081081,"f1":0.08509256252029879,"auc":0.806017195079695,"tnr":0.7786057692307692,"tp":131,"fn":54,"fp":2763,"tn":9717},{"acc":0.8051322542439795,"prec":0.049723756906077346,"rec":0.6774193548387096,"f1":0.09264705882352942,"auc":0.7963277230478386,"tnr":0.8070358201778989,"tp":126,"fn":60,"fp":2408,"tn":10071}],"dt":[{"acc":0.8208589925785568,"prec":0.055104656129859035,"rec":0.6935483870967742,"f1":0.10209734863474476,"auc":0.8078585952577888,"tnr":0.8227564102564102,"tp":129,"fn":57,"fp":2212,"tn":10268},{"acc":0.7632056849585471,"prec":0.046129032258064515,"rec":0.772972972972973,"f1":0.08706240487062405,"auc":0.8424415280665282,"tnr":0.7630608974358974,"tp":143,"fn":42,"fp":2957,"tn":9523},{"acc":0.8333991314646664,"prec":0.045776309579990564,"rec":0.5243243243243243,"f1":0.0842013888888889,"auc":0.7589418745668747,"tnr":0.8379807692307693,"tp":97,"fn":88,"fp":2022,"tn":10458},{"acc":0.8108172127911567,"prec":0.050061050061050064,"rec":0.6648648648648648,"f1":0.09311127933383799,"auc":0.7847565835065835,"tnr":0.8129807692307692,"tp":123,"fn":62,"fp":2334,"tn":10146},{"acc":0.8127121989735492,"prec":0.04983525535420099,"rec":0.6505376344086021,"f1":0.09257842387146137,"auc":0.7914401570983337,"tnr":0.8151294174212678,"tp":121,"fn":65,"fp":2307,"tn":10172}],"knn":[{"acc":0.841386388757303,"prec":0.048985650667986144,"rec":0.532258064516129,"f1":0.08971454463072044,"auc":0.6963179797353184,"tnr":0.8459935897435897,"tp":99,"fn":87,"fp":1922,"tn":10558},{"acc":0.8394788787998421,"prec":0.04302670623145401,"rec":0.4702702702702703,"f1":0.07884005437245128,"auc":0.6645242117117118,"tnr":0.8449519230769231,"tp":87,"fn":98,"fp":1935,"tn":10545},{"acc":0.8338728780102646,"prec":0.043312708234174206,"rec":0.4918918918918919,"f1":0.07961504811898514,"auc":0.6714438236313237,"tnr":0.8389423076923077,"tp":91,"fn":94,"fp":2010,"tn":10470},{"acc":0.8402684563758389,"prec":0.04324055666003976,"rec":0.4702702702702703,"f1":0.07919890760127446,"auc":0.6635122141372142,"tnr":0.8457532051282052,"tp":87,"fn":98,"fp":1925,"tn":10555},{"acc":0.8398736675878405,"prec":0.04808635917566242,"rec":0.5268817204301075,"f1":0.0881294964028777,"auc":0.6888839917728451,"tnr":0.8445388252263804,"tp":98,"fn":88,"fp":1940,"tn":10539}],"base":[{"acc":0.98531501657982,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":186,"fp":0,"tn":12480},{"acc":0.9853928148440584,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":185,"fp":0,"tn":12480},{"acc":0.9853928148440584,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":185,"fp":0,"tn":12480},{"acc":0.9853928148440584,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":185,"fp":0,"tn":12480},{"acc":0.9853138570864588,"prec":0,"rec":0,"f1":0,"auc":0.5,"tnr":1,"tp":0,"fn":186,"fp":0,"tn":12479}]},"models":[["lr","로지스틱"],["lsvm","선형 SVM"],["svc","SVC (RBF)"],["dt","의사결정나무"],["knn","KNN"]]};
+const PI0=D.pi,SW=D.sw;
+function piVal(){const v=+document.getElementById('pi').value;return v===0?PI0:Math.min(0.5,v/200)}
+function upd(){const i=+document.getElementById('th').value,pi=piVal();const tpr=SW.tpr[i],tnr=SW.tnr[i],acc=pi*tpr+(1-pi)*tnr;
+ document.getElementById('thv').textContent=SW.th[i].toFixed(2);document.getElementById('piv').textContent=(pi*100).toFixed(2)+'%'+(pi===PI0?' (실제)':'');
+ document.getElementById('o-tpr').textContent=tpr.toFixed(4);document.getElementById('o-tnr').textContent=tnr.toFixed(4);document.getElementById('o-acc').textContent=acc.toFixed(4);document.getElementById('o-bal').textContent=((tpr+tnr)/2).toFixed(4);
+ document.getElementById('o-formula').textContent=`${pi.toFixed(4)} × ${tpr.toFixed(4)} + ${(1-pi).toFixed(4)} × ${tnr.toFixed(4)} = ${acc.toFixed(4)}`;drawSweep()}
+function drawSweep(){const cv=document.getElementById('sweep-cv');const {c,w,h}=prep(cv,240);const L=40,R=12,T=12,B=30;const i0=+document.getElementById('th').value,pi=piVal();
+ const X=t=>L+(t-0)/(1)*(w-L-R),Y=v=>T+(1-v)*(h-T-B);c.fillStyle=cssv('--surface');c.fillRect(0,0,w,h);c.font='11px '+cssv('--f-body');c.strokeStyle=cssv('--grid');c.fillStyle=cssv('--muted');
+ [0,0.25,0.5,0.75,1].forEach(v=>{c.beginPath();c.moveTo(L,Y(v));c.lineTo(w-R,Y(v));c.stroke();c.textAlign='right';c.fillText(v.toFixed(2),L-4,Y(v)+4)});c.textAlign='center';[0,0.2,0.4,0.6,0.8,1].forEach(t=>c.fillText(t.toFixed(1),X(t),h-14));c.textAlign='right';c.fillText('임계값 →',w-R,h-1);
+ const line=(arr,col,dash)=>{c.strokeStyle=col;c.lineWidth=2;c.setLineDash(dash||[]);c.beginPath();arr.forEach((v,k)=>{k?c.lineTo(X(SW.th[k]),Y(v)):c.moveTo(X(SW.th[k]),Y(v))});c.stroke();c.setLineDash([])};
+ line(SW.tpr,cssv('--c-claim'));line(SW.tnr,cssv('--c-no'));line(SW.tpr.map((t,k)=>pi*t+(1-pi)*SW.tnr[k]),cssv('--c-3'),[5,4]);
+ c.strokeStyle=cssv('--ink');c.lineWidth=1;c.beginPath();c.moveTo(X(SW.th[i0]),T);c.lineTo(X(SW.th[i0]),h-B);c.stroke();
+ [[SW.tpr[i0],'--c-claim'],[SW.tnr[i0],'--c-no'],[pi*SW.tpr[i0]+(1-pi)*SW.tnr[i0],'--c-3']].forEach(([v,col])=>{c.fillStyle=cssv(col);c.strokeStyle=cssv('--surface');c.lineWidth=2;c.beginPath();c.arc(X(SW.th[i0]),Y(v),5,0,7);c.fill();c.stroke()});c.lineWidth=1;
+ document.getElementById('sweep-cap').innerHTML='주황 = TPR, 파랑 = TNR, 보라 점선 = 전체 정확도(π = '+(pi*100).toFixed(2)+'%). π를 키울수록 보라 점선이 주황 쪽으로 끌려갑니다. 실제 π(1.46%)에서는 파랑과 거의 겹칩니다.';
+ const tip=document.getElementById('sweep-tip');cv.onmousemove=ev=>{const r=cv.getBoundingClientRect(),mx=ev.clientX-r.left;const t=(mx-L)/(w-L-R);let k=0,bd=9;SW.th.forEach((x,j)=>{if(Math.abs(x-t)<bd){bd=Math.abs(x-t);k=j}});tip.hidden=false;tip.style.left=X(SW.th[k])+'px';tip.style.top=Y(SW.tpr[k])+'px';tip.textContent='임계값 '+SW.th[k].toFixed(2)+' · TPR '+SW.tpr[k].toFixed(3)+' · TNR '+SW.tnr[k].toFixed(3)};cv.onmouseleave=()=>tip.hidden=true}
+['th','pi'].forEach(id=>document.getElementById(id).addEventListener('input',upd));upd();onTheme(drawSweep);
+// 모델별 막대
+function drawPair(){const cv=document.getElementById('pair-cv');const rows=D.models.map(([k,n])=>{const f=D.FM[k];const tp=f.reduce((s,r)=>s+r.tp,0),fn=f.reduce((s,r)=>s+r.fn,0),fp=f.reduce((s,r)=>s+r.fp,0),tn=f.reduce((s,r)=>s+r.tn,0);return [n,tp/(tp+fn),tn/(tn+fp)]});
+ rows.push(['모두 청구',1,0],['모두 없음',0,1]);const {c,w,h}=prep(cv,30+rows.length*40);const L=96,R=56,T=10;const X=v=>L+v*(w-L-R);c.fillStyle=cssv('--surface');c.fillRect(0,0,w,h);c.font='12px '+cssv('--f-body');window._pb=[];
+ rows.forEach(([n,a,b],i)=>{const y=T+i*40;c.fillStyle=cssv('--ink');c.textAlign='right';c.fillText(n,L-8,y+18);
+  [[a,'--c-claim',0],[b,'--c-no',16]].forEach(([v,col,off])=>{c.fillStyle=cssv('--sunken');c.fillRect(L,y+off+2,w-L-R,13);c.fillStyle=cssv(col);c.beginPath();const ww=Math.max(0.5,X(v)-L);c.roundRect?c.roundRect(L,y+off+2,ww,13,[0,4,4,0]):c.rect(L,y+off+2,ww,13);c.fill();c.fillStyle=cssv('--muted');c.textAlign='left';c.fillText(v.toFixed(3),X(1)+6,y+off+13);_pb.push([L,y+off+2,w-R,y+off+15,n+' · '+(off?'TNR ':'TPR ')+v.toFixed(4)])})});
+ const tip=document.getElementById('pair-tip');cv.onmousemove=ev=>{const r=cv.getBoundingClientRect(),mx=ev.clientX-r.left,my=ev.clientY-r.top;const b=_pb.find(b=>mx>=b[0]&&mx<=b[2]&&my>=b[1]&&my<=b[3]);if(!b){tip.hidden=true;return}tip.hidden=false;tip.style.left=mx+'px';tip.style.top=my+'px';tip.textContent=b[4]};cv.onmouseleave=()=>tip.hidden=true}
+drawPair();onTheme(drawPair);
+</script>
+</body>
+</html>

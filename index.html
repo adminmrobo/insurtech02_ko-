@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<script>
+(function(){var KEY='it2_lang',AVAILABLE=['ko'],LANGS=['ko','en','zh','ja','uz','ru'];
+var cur=document.documentElement.lang||'ko';cur=cur.slice(0,2);
+function root(){var p=location.pathname;var dir=p.replace(/[^\/]*$/,'');if(cur!=='ko'){dir=dir.replace(/[^\/]+\/$/,'')}return dir}
+function file(){var f=location.pathname.split('/').pop();if(!f)f='index.html';if(!/\.html?$/.test(f))f+='.html';return f}
+function url(l){return root()+(l==='ko'?'':l+'/')+file()+location.search.replace(/[?&]lang=[^&]*/,'').replace(/^&/,'?')+location.hash}
+function exists(u,cb){if(location.protocol==='file:'){cb(true);return}try{fetch(u,{method:'HEAD'}).then(function(r){cb(!(r.status===404||r.status===410))},function(){cb(true)})}catch(e){cb(true)}}
+function save(l){try{localStorage.setItem(KEY,l)}catch(e){}}
+function drop(){try{localStorage.removeItem(KEY)}catch(e){}}
+window.itSetLang=function(l,manual){if(l===cur)return;
+ if(AVAILABLE.indexOf(l)<0){if(manual){var n=document.getElementById('lang-note');if(n){n.hidden=false;n.textContent='이 언어판은 아직 준비 중입니다 ('+l+'). 한국어판을 보여 드립니다.'}}else{drop()}return}
+ var u=url(l);exists(u,function(ok){if(ok){if(manual)save(l);location.href=u}else{drop();if(manual){var n=document.getElementById('lang-note');if(n){n.hidden=false;n.textContent='언어판 파일을 찾지 못했습니다: '+u}}}})};
+var q=(location.search.match(/[?&]lang=([a-z]{2})/)||[])[1];
+if(q&&LANGS.indexOf(q)>=0){save(q);if(q!==cur)itSetLang(q,true);return}
+var s=null;try{s=localStorage.getItem(KEY)}catch(e){}
+if(s&&s!==cur){itSetLang(s,false);return}
+if(!s){var b=(navigator.language||'ko').slice(0,2);if(b!==cur&&AVAILABLE.indexOf(b)>=0)itSetLang(b,false)}
+})();
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전</title>
+<meta name="description" content="AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전 — 여행자보험 청구 예측 과제 다섯 문항(5-Fold 검증 · 조건부 정확도 · 문제점과 개선 · HTML 배포 · 유사 사례)을 다섯 편에 걸쳐 따라 푸는 인터랙티브 튜토리얼.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Silkscreen&display=swap">
+<style>
+
+.say .av:has(img){background:#fff}
+.say .av img{display:block}
+img.scene{display:block;width:100%;max-width:720px;height:auto;aspect-ratio:9/5;object-fit:cover;border-radius:var(--r)}
+img.keyvis{display:block;width:100%;height:auto;aspect-ratio:1100/320;object-fit:cover;border-radius:var(--r)}
+img.pic{display:block;width:100%;height:auto;aspect-ratio:480/440;object-fit:cover;border-radius:6px}
+.crew .cf{background:#fff}
+.crew .cf img{width:100%;height:100%;object-fit:contain}
+.crew .moods button img{width:36px;height:36px;border-radius:7px;display:block}
+/* 레이아웃: 보상 센터 연구 노트 — 상단 바 · 히어로(그림 자리) · 육각 번호 섹션 · 카드형 실습 */
+:root{
+  --bg:#f6f5fb; --surface:#ffffff; --sunken:#eeecf7; --ink:#1d1a2e; --muted:#5d5873; --line:#dcd8ea;
+  --accent:#5b47c9; --accent-ink:#ffffff; --accent-soft:#ece8ff;
+  --core:#6a4fd8; --data:#c2417a; --seq:#13857f;
+  --c-no:#2f86c9; --c-claim:#d9730d; --c-3:#7b61d9; --c-4:#1f9e78;
+  --risk:#b4471b; --risk-bg:#fdeee6; --safe:#1f7a5c; --safe-bg:#e5f4ee; --warn:#9a620e; --warn-bg:#fbf1df;
+  --grid:#e6e3f0;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --f-pixel:"Silkscreen","IBM Plex Mono",monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12111a; --surface:#1b1a26; --sunken:#0e0d15; --ink:#ece9f7; --muted:#a29dba; --line:#2e2b40;
+  --accent:#a998ff; --accent-ink:#14121f; --accent-soft:#2a2547;
+  --core:#a48cf0; --data:#f07aaa; --seq:#4cc3b9;
+  --c-no:#3f8fd2; --c-claim:#d8742a; --c-3:#8a74e0; --c-4:#26a17c;
+  --risk:#f08a5d; --risk-bg:#3a1f16; --safe:#5fcf9f; --safe-bg:#14302a; --warn:#e3aa52; --warn-bg:#33270f;
+  --grid:#2a2738; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12111a; --surface:#1b1a26; --sunken:#0e0d15; --ink:#ece9f7; --muted:#a29dba; --line:#2e2b40;
+  --accent:#a998ff; --accent-ink:#14121f; --accent-soft:#2a2547;
+  --core:#a48cf0; --data:#f07aaa; --seq:#4cc3b9;
+  --c-no:#3f8fd2; --c-claim:#d8742a; --c-3:#8a74e0; --c-4:#26a17c;
+  --risk:#f08a5d; --risk-bg:#3a1f16; --safe:#5fcf9f; --safe-bg:#14302a; --warn:#e3aa52; --warn-bg:#33270f;
+  --grid:#2a2738; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.7;word-break:keep-all;overflow-wrap:break-word}
+a{color:var(--accent)}
+h1,h2,h3{line-height:1.3;text-wrap:balance;margin:0}
+p{margin:0}
+code,pre,.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:20px}
+nav.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+nav.top .wrap{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;padding-block:8px}
+nav.top .brand{font-weight:700;text-decoration:none;color:var(--ink);white-space:nowrap}
+nav.top .brand b{font-family:var(--f-pixel);font-weight:400;color:var(--accent);margin-left:4px}
+nav.top .links{display:flex;gap:2px 12px;flex-wrap:wrap;font-size:.86rem;flex:1;min-width:0}
+nav.top .links a{color:var(--muted);text-decoration:none}
+nav.top .links a:hover{color:var(--ink)}
+nav.top select{width:auto;font:inherit;font-size:.82rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+header.hero{padding-block:28px 20px}
+.hero-grid{display:grid;gap:18px}
+.series{display:flex;flex-wrap:wrap;gap:6px}
+.series a{font-size:.78rem;text-decoration:none;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--surface)}
+.series a.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.kicker{font-family:var(--f-pixel);font-size:.82rem;color:var(--accent);letter-spacing:.04em}
+h1{font-size:clamp(1.7rem,4.2vw,2.5rem);font-weight:700;letter-spacing:-.015em}
+.lead{font-size:1.06rem;color:var(--muted);max-width:68ch}
+.byline{font-size:.84rem;color:var(--muted)}
+.guide{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted)}
+.guide span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.chat{display:grid;gap:10px;max-width:760px}
+.say{display:flex;gap:12px;align-items:flex-start}
+.say .av{flex:0 0 52px;height:52px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:1.05rem;color:var(--accent-ink);background:var(--avc,var(--accent));position:relative;overflow:hidden}
+.say .av img{width:100%;height:100%;object-fit:cover;object-position:50% 18%}
+.say .av small{position:absolute;bottom:2px;left:0;right:0;font-size:.55rem;font-weight:500;text-align:center;opacity:.85}
+.say .sbub{background:var(--surface);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:8px 14px;min-width:0}
+.say .sbub b{font-size:.8rem;color:var(--muted);display:block}
+.say .sbub ul{margin:4px 0 0;padding-left:1.2em}
+.npc{display:inline-block;margin-left:6px;font-family:var(--f-pixel);font-size:.62rem;font-weight:400;letter-spacing:.06em;color:#3a2a00;background:#f2c94c;border:1px solid #b8901a;border-radius:3px;padding:0 5px;vertical-align:1px}
+.bomi{--avc:#d9730d}.actuary{--avc:#5b47c9}.fly{--avc:#13857f}.robo{--avc:#2f86c9}
+section.part{padding-block:34px 10px;border-top:1px solid var(--line);margin-top:26px}
+.part-head{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center;margin-bottom:16px}
+.hex{width:44px;height:50px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:var(--kc,var(--accent));color:#fff;display:grid;place-items:center;font-family:var(--f-pixel);font-size:1.05rem;grid-row:span 2}
+.part-head h2{font-size:1.4rem}
+.part-head h2 span.en{font-family:var(--f-pixel);font-weight:400;font-size:.72rem;color:var(--muted);margin-left:8px;letter-spacing:.03em}
+.part-head p{color:var(--muted);font-size:.94rem}
+.body{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.body>p,.body>ul,.body>ol{max-width:72ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:grid;gap:12px;min-width:0;align-content:start}
+.card h3{font-size:1.02rem}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.76rem;color:var(--muted);font-weight:600;letter-spacing:.02em;white-space:nowrap}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+tr.hl td{background:var(--accent-soft);font-weight:600}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit}
+.btn{text-decoration:none;display:inline-block;font-size:.9rem;font-weight:600;border-radius:8px;padding:7px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn[aria-pressed="true"],.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{font-size:.8rem;padding:3px 10px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dial{display:grid;gap:4px;min-width:0;align-content:start}
+.dial label{font-size:.86rem;font-weight:500;display:flex;justify-content:space-between;gap:8px}
+.dial label output{font-family:var(--f-mono);color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select,input[type=text],input[type=number]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-width:0}
+.canvas-box{position:relative;min-width:0}
+.canvas-box canvas{width:100%;display:block;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.cap{font-size:.86rem;color:var(--muted)}
+.cap b{color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:.76rem;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-120%);z-index:5}
+.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:8px}
+.stat>div{background:var(--sunken);border-radius:6px;padding:8px 12px;display:grid}
+.stat .l{font-size:.74rem;color:var(--muted)}
+.stat .v{font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:6.5em 1fr 4.2em;gap:8px;align-items:center;font-size:.84rem}
+.bar .track{position:relative;height:16px;background:var(--sunken);border-radius:4px}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;background:var(--c,var(--accent));transition:width .25s}
+.bar .base{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.bar .v{font-family:var(--f-mono);text-align:right}
+@media (prefers-reduced-motion:reduce){.bar .fill{transition:none}}
+.cm{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;max-width:440px;font-variant-numeric:tabular-nums}
+.cm .h{font-size:.76rem;color:var(--muted);font-weight:600;display:flex;align-items:end;padding:2px 4px}
+.cm .rh{align-items:center}
+.cm .c{border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:grid;background:var(--surface)}
+.cm .c b{font-size:1.15rem}
+.cm .c span{font-size:.74rem;color:var(--muted)}
+.cm .c.ok{background:var(--safe-bg);border-color:transparent}
+.cm .c.bad{background:var(--risk-bg);border:2px solid var(--risk)}
+.cm .c.bad span{color:var(--risk);font-weight:600}
+.pill{display:inline-block;font-size:.74rem;font-weight:600;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.pill.risk{background:var(--risk-bg);color:var(--risk)}.pill.safe{background:var(--safe-bg);color:var(--safe)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.pass{background:var(--safe-bg);color:var(--safe)}.pill.fail{background:var(--risk-bg);color:var(--risk)}
+.note{border-left:3px solid var(--warn);background:var(--warn-bg);padding:8px 14px;border-radius:0 6px 6px 0;font-size:.9rem}
+.note.info{border-color:var(--accent);background:var(--accent-soft)}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px;display:grid;gap:10px}
+.q .qt{font-weight:600}
+.q .opts{display:grid;gap:6px}
+.q .opts button{text-align:left;font-size:.92rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+.q .opts button.right{border-color:var(--safe);background:var(--safe-bg)}
+.q .opts button.wrong{border-color:var(--risk);background:var(--risk-bg)}
+.q .fb{font-size:.9rem}
+.codebox{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.codebox .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);background:var(--sunken);padding:6px 6px 0}
+.codebox .tabs button{border:0;background:none;padding:6px 12px;border-radius:6px 6px 0 0;cursor:pointer;color:var(--muted);font-size:.84rem;font-family:var(--f-mono)}
+.codebox .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:500}
+.codebox .tools{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);align-items:center}
+.codebox .tools span{font-size:.78rem;color:var(--muted);flex:1;min-width:12em}
+.codebox pre{margin:0;padding:14px 16px;overflow:auto;max-height:440px;font-size:.8rem;line-height:1.55;white-space:pre}
+details.run{border:1px solid var(--line);border-radius:var(--r);background:var(--sunken)}
+details.run summary{cursor:pointer;padding:8px 14px;font-size:.88rem;font-weight:500}
+details.run pre{margin:0;padding:10px 16px 14px;overflow:auto;font-size:.78rem;line-height:1.5}
+.gloss{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px}
+.gloss div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px}
+.gloss dt{font-weight:600}.gloss dd{margin:2px 0 0;font-size:.88rem;color:var(--muted)}
+.gloss dd i{font-style:normal;color:var(--ink)}
+.prompt pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunken);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;font-size:.8rem;max-height:360px;overflow:auto;margin:0}
+.teach-link{display:inline-block;font-weight:600;text-decoration:none;border:1px solid var(--accent);border-radius:8px;padding:8px 14px}
+section.outro{margin-top:40px;padding-block:30px;border-top:1px solid var(--line)}
+.outro .scene{width:100%;max-width:720px;aspect-ratio:720/400;border-radius:var(--r)}
+.placeholder{display:grid;place-items:center;text-align:center;background:repeating-linear-gradient(135deg,var(--sunken) 0 12px,var(--surface) 12px 24px);border:1px dashed var(--line);color:var(--muted);font-size:.82rem;padding:10px}
+.nav-eps{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+footer{border-top:1px solid var(--line);margin-top:30px;padding-block:22px 40px;font-size:.82rem;color:var(--muted)}
+footer .wrap{display:grid;gap:8px}
+.robo-w{align-items:center}
+.robo-w .av{flex-basis:64px;height:64px;font-size:1.4rem}
+.robo-w[data-st="wrong"] .av{--avc:var(--risk)}
+.robo-w[data-st="success"] .av{--avc:var(--safe)}
+.robo-w[data-st="confused"] .av{--avc:var(--warn)}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.player input[type=range]{flex:1;min-width:140px}
+.stamp{justify-self:start;border:3px double currentColor;border-radius:4px;padding:6px 16px;font-weight:700;font-size:1.35rem;letter-spacing:.04em;transform:rotate(-2deg)}
+.stamp.risk{color:var(--risk)}.stamp.safe{color:var(--safe)}.stamp.reject{color:var(--warn)}
+@media (max-width:560px){body{font-size:15px}.part-head h2{font-size:1.2rem}.say .av{flex-basis:44px;height:44px}}
+
+.task{border:1px solid var(--line);border-left:4px solid var(--data);background:var(--surface);border-radius:0 var(--r) var(--r) 0;padding:14px 18px;display:grid;gap:8px}
+.task .tt{font-family:var(--f-pixel);font-size:.8rem;color:var(--data)}
+.task ul{margin:0;padding-left:1.2em}
+.answer{border:2px dashed var(--accent);border-radius:var(--r);padding:14px 18px;display:grid;gap:10px;background:var(--surface)}
+.answer .tt{font-weight:700;color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{font-size:.76rem;border:1px solid var(--line);border-radius:999px;padding:1px 9px;background:var(--sunken)}
+.chips span.ban{border-color:var(--risk);color:var(--risk);background:var(--risk-bg)}
+
+.crewgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:14px}
+.crew{align-content:start}
+.crew .faces{position:relative;aspect-ratio:4/3;width:100%;overflow:hidden;border-radius:var(--r)}
+.crew .cf{position:absolute;inset:0;display:none;border-radius:var(--r);flex-direction:column;gap:4px}
+.crew .cf.on{display:grid;align-content:center}
+.crew .moods{display:flex;flex-wrap:wrap;gap:6px}
+.crew .moods button{width:44px;height:44px;border-radius:10px;border:2px solid var(--line);background:var(--sunken);cursor:pointer;display:grid;place-items:center;padding:0;line-height:1.1;color:var(--avc)}
+.crew .moods button small{font-size:.58rem;color:var(--muted)}
+.crew .moods button[aria-pressed="true"]{border-color:var(--avc)}
+.tagx{display:inline-block;font-size:.72rem;font-weight:600;background:var(--sunken);border-radius:4px;padding:0 6px;margin-right:4px;color:var(--muted)}
+.cline{font-weight:500}
+.keyvis{width:100%;aspect-ratio:1100/320;border-radius:var(--r)}
+.stops{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:14px}
+.stop{border-top:4px solid var(--kc)}
+.stop .pic{aspect-ratio:480/440;border-radius:6px}
+.stop .no{font-family:var(--f-pixel);color:var(--kc)}
+.bigq{font-size:1.15rem;font-weight:600;border-left:4px solid var(--accent);padding:6px 14px;background:var(--accent-soft);border-radius:0 8px 8px 0;max-width:72ch}
+</style>
+</head>
+<body>
+<nav class="top"><div class="wrap"><a class="brand" href="index.html">인슈어테크 #2 실전</a><div class="links"><a href="#assign">과제와 편</a><a href="#crew">식구들</a><a href="#data">데이터</a><a href="#map">연구 지도</a><a href="#how">보는 법</a><a href="answers.html">교육자용 정답</a></div><select id="lang-sel" aria-label="언어 선택" onchange="itSetLang(this.value,true)"><option value="ko" selected>한국어</option><option value="en">English</option><option value="zh">中文</option><option value="ja">日本語</option><option value="uz">O'zbekcha</option><option value="ru">Русский</option></select></div></nav><header class="hero"><div class="wrap hero-grid"><img class="keyvis" src="assets/hero.webp" alt="닫힌 문 다섯 개 앞에서 과제지를 든 조교와 식구들" width="1100" height="320">
+<p class="kicker">AI x BUSINESS #1 · INSURTECH 02 · CLASSIFICATION IN PRACTICE</p><h1>AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전</h1>
+<p class="lead">기계학습 과제 「여행자 보험금 청구(Claim) 예측」의 다섯 문항을 <b>한 편에 한 문항씩</b> 따라 풀어 보는 튜토리얼입니다. 증강 없이 5-Fold 로 재고, 청구자만의 정확도를 정의하고, 그 숫자의 함정을 고치고, 모델을 HTML 하나로 내보내고, 다른 산업의 같은 문제와 비교합니다. 페이지의 숫자는 모두 같은 코드를 실제로 실행한 결과이며, 코드는 Colab 에서 그대로 돌아갑니다.</p>
+<p class="bigq">청구 1.46%의 극단적 불균형 데이터에서, 증강 없이 세운 분류 모델을 어떻게 검증하고 HTML로 내보낼까?</p>
+<div class="chat"><div class="say bomi"><div class="av" data-face="smile" aria-hidden="true"><img src="assets/av_bomi_smile.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>조교</b><p>박사님, 이번엔 과제래요. 문항이 다섯 개! 근데 5-Fold 는 처음이에요.</p></div></div><div class="say actuary"><div class="av" data-face="explain" aria-hidden="true"><img src="assets/av_actuary_explain.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>박사<span class="npc" title="NPC">NPC</span></b><p>(손바닥을 든다) …기준선부터 봅시다. 그다음은 같이 하면 됩니다.</p></div></div><div class="say robo robo-w" id="robo-i" data-st="idle" aria-live="polite"><div class="av" data-rs="idle" aria-hidden="true"><img src="assets/av_robo_idle.webp" alt="" width="160" height="160" loading="lazy"></div><div class="av" data-rs="thinking" hidden aria-hidden="true"><img src="assets/av_robo_thinking.webp" alt="" width="160" height="160" loading="lazy"></div><div class="av" data-rs="wrong" hidden aria-hidden="true"><img src="assets/av_robo_wrong.webp" alt="" width="160" height="160" loading="lazy"></div><div class="av" data-rs="confused" hidden aria-hidden="true"><img src="assets/av_robo_confused.webp" alt="" width="160" height="160" loading="lazy"></div><div class="av" data-rs="success" hidden aria-hidden="true"><img src="assets/av_robo_success.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>머니로보</b><p data-rs="idle">삐빅. 머니로보입니다. 4편에서는 제가 이 페이지 안에서 직접 판정해요.</p><p data-rs="thinking" hidden>삐빅, 계산 중…</p><p data-rs="wrong" hidden>규칙이 빠졌어요!</p><p data-rs="confused" hidden>판단 보류…</p><p data-rs="success" hidden>sklearn 과 한 명도 다르지 않아요!</p></div></div><div class="say fly"><div class="av" data-face="front" aria-hidden="true"><img src="assets/av_fly_front.webp" alt="" width="160" height="160" loading="lazy"></div><div class="sbub"><b>초파리 연구원</b><p>문항 다섯, 편도 다섯, 폴드도 다섯. 저는 다리가 여섯이라 하나가 남네요.</p></div></div></div>
+<div class="btns"><a class="btn primary" href="1_kfold_cv.html">1편 (문항 1)부터</a><a class="btn" href="#assign">과제와 편 대응</a><a class="btn" href="data/travel_insurance.csv">데이터 CSV</a><a class="btn" href="https://adminmrobo.github.io/ai-biz-insurtech-01/">앞 시리즈: 인슈어테크_01</a></div>
+<p class="byline">글 · 안상선 ((주)M-Robo 대표) · CC BY-NC 4.0</p></div></header><section class="part" id="assign"><div class="wrap"><div class="part-head" style="--kc:var(--data)"><div class="hex">✎</div><h2>과제 문항과 편 대응<span class="en">Assignment map</span></h2><p>과제 안내문의 문항 1~5를 그대로 한 편씩.</p></div><div class="body"><div class="cols"><div class="card"><h3>과제의 공통 제약 (모든 편이 지킴)</h3><ul><li><b>데이터 증강 금지</b> · SMOTE · ADASYN · 오버샘플링 · 합성 데이터 · 단순 복제 모두 사용하지 않음. 불균형은 class_weight 와 임계값으로만</li><li><b>5-Fold 교차검증</b> · StratifiedKFold(n_splits=5, shuffle=True, random_state=42), fold 별 점수 5개 + 평균 ± 표준편차</li><li><b>누수 금지</b> · 표준화 등은 Pipeline 안에서 학습 fold 로만 fit, 임계값은 학습 데이터 교차검증 확률로만</li><li><b>Accuracy 단독 보고 금지</b> · Precision · Recall · F1 · ROC-AUC 함께</li></ul></div>
+<div class="card"><h3>과제 데이터</h3><p>여행자보험 63,326건 × 11열, 청구 927건(<b>1.46%</b>, 약 1 : 67), Gender 결측 71.23%. 데이터 정리 규칙과 모델 다섯 개는 <a href="https://adminmrobo.github.io/ai-biz-insurtech-01/">인슈어테크_01</a> 과 같습니다.</p></div></div>
+<div class="tblwrap"><table><thead><tr><th>과제 문항</th><th>이 시리즈</th><th>무엇을 하나</th></tr></thead><tbody><tr><td><b>문항 1</b></td><td><a href="1_kfold_cv.html">1편 · 증강 없이 5-Fold로 성능 재기</a></td><td>모델 5개를 StratifiedKFold(5)로 다시 학습해 fold별 점수 5개와 평균 ± 표준편차를 낸다. 정확도만 보면 왜 위험한지 숫자로 본다.</td></tr><tr><td><b>문항 2</b></td><td><a href="2_conditional_accuracy.html">2편 · 청구자만, 미청구자만 맞힌 비율</a></td><td>청구자만 정확도는 재현율(TPR), 미청구자만 정확도는 특이도(TNR). 전체 정확도 = π·TPR + (1−π)·TNR 을 직접 확인한다.</td></tr><tr><td><b>문항 3</b></td><td><a href="3_problems_fixes.html">3편 · 그 숫자를 성능이라 부르면 생기는 일</a></td><td>청구자 정확도만 보고하면 생기는 문제 5가지와 1:1 개선 방안. 신뢰구간 · PR-AUC · 청구율별 정밀도 · 중첩 교차검증으로 확인한다.</td></tr><tr><td><b>문항 4</b></td><td><a href="4_html_deploy.html">4편 · 그 모델, HTML에 그대로 넣어도 될까</a></td><td>결론부터: 그대로는 안 된다. 성별 빈칸 규칙 하나를 빼먹으면 시험 고객 52%의 판정이 바뀐다. 함께 내보낼 것과 대안 4가지.</td></tr><tr><td><b>문항 5</b></td><td><a href="5_similar_cases.html">5편 · 희소 이벤트는 어디에나 있다</a></td><td>카드 사기 · 유방암 검진 · 디스크 고장 · 보험 사기. 같은 구조, 같은 함정, 실무 해결 전략과 우선순위 3개.</td></tr></tbody></table></div>
+<p class="note info">튜토리얼입니다. 각 편의 “보고서 답안 틀”은 숫자를 <b>본인 실행 결과로 바꿔</b> 쓰도록 만들었습니다. 문항 5의 사례는 출처를 직접 열어 확인하고 본인 말로 다시 쓰세요.</p></div></div></section><section class="part" id="crew"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">♥</div><h2>식구들<span class="en">The crew</span></h2><p>인슈어테크_01 과 같은 식구입니다. 그림 버튼을 누르면 모습이 바뀝니다.</p></div><div class="body"><div class="crewgrid"><div class="card crew bomi"><div class="faces"><div class="cf on" data-face="smile"><img src="assets/bomi_smile.webp" alt="조교 · 미소" width="320" height="440" loading="lazy"></div><div class="cf" data-face="curious"><img src="assets/bomi_curious.webp" alt="조교 · 궁금" width="320" height="440" loading="lazy"></div><div class="cf" data-face="surprised"><img src="assets/bomi_surprised.webp" alt="조교 · 놀람" width="320" height="440" loading="lazy"></div><div class="cf" data-face="worried"><img src="assets/bomi_worried.webp" alt="조교 · 곤란" width="320" height="440" loading="lazy"></div><div class="cf" data-face="proud"><img src="assets/bomi_proud.webp" alt="조교 · 뿌듯" width="320" height="440" loading="lazy"></div></div><h3>조교 · 박사님 연구실 조교</h3>
+<p><span class="tagx">역할</span> 학습자 대신 &quot;왜요?&quot;를 묻고, 박사님 말에 제일 먼저 반응한다</p><p><span class="tagx">성격</span> 숫자보다 고객 얼굴이 먼저 떠오르는 조교. 궁금하면 못 참고, 박사님이 같은 말을 하면 바로 “또요?”가 나온다.</p><p class="cline">“정확도 98%인데 청구 고객은 한 명도 못 찾았다고요? …박사님, 설마 또 기준선이에요?”</p>
+<div class="moods" role="group" aria-label="조교의 모습 바꾸기"><button data-fb="smile" aria-pressed="true" title="미소"><img src="assets/av_bomi_smile.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="curious" aria-pressed="false" title="궁금"><img src="assets/av_bomi_curious.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="surprised" aria-pressed="false" title="놀람"><img src="assets/av_bomi_surprised.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="worried" aria-pressed="false" title="곤란"><img src="assets/av_bomi_worried.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="proud" aria-pressed="false" title="뿌듯"><img src="assets/av_bomi_proud.webp" alt="" width="36" height="36" loading="lazy"></button></div></div><div class="card crew actuary"><div class="faces"><div class="cf on" data-face="front"><img src="assets/actuary_front.webp" alt="박사 · 앞모습" width="320" height="440" loading="lazy"></div><div class="cf" data-face="explain"><img src="assets/actuary_explain.webp" alt="박사 · 설명" width="320" height="440" loading="lazy"></div><div class="cf" data-face="calc"><img src="assets/actuary_calc.webp" alt="박사 · 계산" width="320" height="440" loading="lazy"></div><div class="cf" data-face="note"><img src="assets/actuary_note.webp" alt="박사 · 기록" width="320" height="440" loading="lazy"></div></div><h3>박사<span class="npc" title="NPC">NPC</span> · 보험 데이터 연구소 박사</h3>
+<p><span class="tagx">역할</span> 비유와 실제 숫자로 설명하고, 편 끝에 핵심 세 줄을 정리한다</p><p><span class="tagx">성격</span> 연구소 같은 자리에 늘 서 있는 NPC. 말을 걸 때마다 차분하게 같은 원칙을 되풀이한다. 한쪽 손바닥을 들면 설명이 시작된다.</p><p class="cline">“(말을 걸었다) …그 숫자, 기준선부터 봅시다. (다시 말을 걸었다) …기준선부터 봅시다.”</p>
+<div class="moods" role="group" aria-label="박사의 모습 바꾸기"><button data-fb="front" aria-pressed="true" title="앞모습"><img src="assets/av_actuary_front.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="explain" aria-pressed="false" title="설명"><img src="assets/av_actuary_explain.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="calc" aria-pressed="false" title="계산"><img src="assets/av_actuary_calc.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="note" aria-pressed="false" title="기록"><img src="assets/av_actuary_note.webp" alt="" width="36" height="36" loading="lazy"></button></div></div><div class="card crew fly"><div class="faces"><div class="cf on" data-face="front"><img src="assets/fly_front.webp" alt="초파리 연구원 · 앞모습" width="320" height="440" loading="lazy"></div><div class="cf" data-face="side"><img src="assets/fly_side.webp" alt="초파리 연구원 · 옆모습" width="320" height="440" loading="lazy"></div><div class="cf" data-face="idea"><img src="assets/fly_idea.webp" alt="초파리 연구원 · 번뜩" width="320" height="440" loading="lazy"></div><div class="cf" data-face="cry"><img src="assets/fly_cry.webp" alt="초파리 연구원 · 울먹" width="320" height="440" loading="lazy"></div></div><h3>초파리 연구원 · 다음 질문 담당</h3>
+<p><span class="tagx">역할</span> 편 끝마다 다음 편의 질문을 던진다</p><p><span class="tagx">성격</span> 원래 실험 대상이었는데 연구원으로 승진했다. 짧고 엉뚱하지만 질문은 늘 정곡을 찌른다.</p><p class="cline">“그런데 그 규칙, 종이에 적을 수 있어요?”</p>
+<div class="moods" role="group" aria-label="초파리 연구원의 모습 바꾸기"><button data-fb="front" aria-pressed="true" title="앞모습"><img src="assets/av_fly_front.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="side" aria-pressed="false" title="옆모습"><img src="assets/av_fly_side.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="idea" aria-pressed="false" title="번뜩"><img src="assets/av_fly_idea.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="cry" aria-pressed="false" title="울먹"><img src="assets/av_fly_cry.webp" alt="" width="36" height="36" loading="lazy"></button></div></div><div class="card crew robo"><div class="faces"><div class="cf on" data-face="idle"><img src="assets/robo_idle.webp" alt="머니로보 · 대기" width="320" height="440" loading="lazy"></div><div class="cf" data-face="thinking"><img src="assets/robo_thinking.webp" alt="머니로보 · 심사 중" width="320" height="440" loading="lazy"></div><div class="cf" data-face="wrong"><img src="assets/robo_wrong.webp" alt="머니로보 · 놓침" width="320" height="440" loading="lazy"></div><div class="cf" data-face="confused"><img src="assets/robo_confused.webp" alt="머니로보 · 판단 보류" width="320" height="440" loading="lazy"></div><div class="cf" data-face="success"><img src="assets/robo_success.webp" alt="머니로보 · 청구 탐지" width="320" height="440" loading="lazy"></div></div><h3>머니로보 · money-robo · 판정 로봇 (상태 캐릭터)</h3>
+<p><span class="tagx">역할</span> 지금 모델의 상태를 얼굴 표시창으로 보여 준다</p><p><span class="tagx">성격</span> 삐빅. 이름은 머니로보지만 돈은 안 받는다. “비용”이라는 말만 나오면 램프가 켜지고, 청구 고객을 놓치면 표시창이 빨개진다.</p><p class="cline">“삐빅, 심사 중… 청구 위험 고객 발견!”</p>
+<div class="moods" role="group" aria-label="머니로보의 모습 바꾸기"><button data-fb="idle" aria-pressed="true" title="대기"><img src="assets/av_robo_idle.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="thinking" aria-pressed="false" title="심사 중"><img src="assets/av_robo_thinking.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="wrong" aria-pressed="false" title="놓침"><img src="assets/av_robo_wrong.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="confused" aria-pressed="false" title="판단 보류"><img src="assets/av_robo_confused.webp" alt="" width="36" height="36" loading="lazy"></button><button data-fb="success" aria-pressed="false" title="청구 탐지"><img src="assets/av_robo_success.webp" alt="" width="36" height="36" loading="lazy"></button></div></div></div></div></div></section><section class="part" id="data"><div class="wrap"><div class="part-head" style="--kc:var(--data)"><div class="hex">◆</div><h2>데이터<span class="en">The data</span></h2><p>여행자보험 63,326건, 맞힐 것은 보험금 청구 여부.</p></div><div class="body"><p>원 출처(<a href="https://raw.githubusercontent.com/fintech-data/Revolution/main/data/travel%20insurance.csv">fintech-data/Revolution 의 travel insurance.csv</a>)와 같은 파일을 이 저장소의 <a href="data/travel_insurance.csv">data/travel_insurance.csv</a> 로 복사해 두었습니다(내용 동일, 파일 이름의 공백만 밑줄로). 코드는 저장소 안 파일을 먼저 읽습니다. 가상 데이터를 만들거나 행을 늘리지 않습니다.</p>
+<div class="tblwrap"><table><thead><tr><th>파일</th><th>내용</th></tr></thead><tbody>
+<tr><td><a class="mono" href="data/travel_insurance.csv">data/travel_insurance.csv</a></td><td>원본 63,326행 × 11열 (정리 전)</td></tr>
+<tr><td><a class="mono" href="data/split.csv">data/split.csv</a></td><td>4편 배포 실험용 학습/시험 나누기 (층화 80:20, random_state=42) — 인슈어테크_01 과 같음</td></tr>
+<tr><td><a class="mono" href="data/logistic_model.json">data/logistic_model.json</a></td><td>4편: 브라우저 추론용으로 내보낸 로지스틱 모델 (규칙 · 사전 · 표준화 · 계수 · 임계값)</td></tr></tbody></table></div>
+<div class="cols"><div class="card"><h3>기준선</h3><p>“모두 청구 없음”: 5-Fold 평균 정확도 <b>98.54%</b>, 재현율 <b>0</b>. 모든 점수는 이 숫자와 함께 읽습니다.</p></div>
+<div class="card"><h3>교차검증</h3><p>1~3편은 전체 63,326건을 StratifiedKFold(5)로 나눠, fold 마다 청구 185~186명.</p></div>
+<div class="card"><h3>배포 실험</h3><p>4편은 학습 50,660 / 시험 12,666 으로 최종 모델을 만들고, 시험 고객 원본 입력으로 브라우저 판정을 검증.</p></div></div></div></div></section><section class="part" id="map"><div class="wrap"><div class="part-head" style="--kc:var(--core)"><div class="hex">★</div><h2>연구 지도: 다섯 편<span class="en">Research map</span></h2><p>앞 편의 숫자가 다음 편의 질문이 됩니다.</p></div><div class="body"><div class="guide"><span style="--c:var(--core)">원리</span><span style="--c:var(--data)">성능·데이터</span><span style="--c:var(--seq)">직접 실험</span></div>
+<div class="stops"><a class="card stop" href="1_kfold_cv.html" style="--kc:var(--core);text-decoration:none;color:inherit"><img class="pic" src="assets/c1.webp" alt="" width="720" height="660" loading="lazy">
+<span class="no">EPISODE 1 · 문항 1 · 해설형</span><h3>증강 없이 5-Fold로 성능 재기</h3><p class="cap">모델 5개를 StratifiedKFold(5)로 다시 학습해 fold별 점수 5개와 평균 ± 표준편차를 낸다. 정확도만 보면 왜 위험한지 숫자로 본다.</p><p><span class="tagx">이런 걸 해 봐요</span> 정렬된 데이터를 섞지 않고 나누면 fold마다 청구 수가 87~254명으로 흔들리는 것을 본다</p></a><a class="card stop" href="2_conditional_accuracy.html" style="--kc:var(--core);text-decoration:none;color:inherit"><img class="pic" src="assets/c2.webp" alt="" width="720" height="660" loading="lazy">
+<span class="no">EPISODE 2 · 문항 2 · 해설형</span><h3>청구자만, 미청구자만 맞힌 비율</h3><p class="cap">청구자만 정확도는 재현율(TPR), 미청구자만 정확도는 특이도(TNR). 전체 정확도 = π·TPR + (1−π)·TNR 을 직접 확인한다.</p><p><span class="tagx">이런 걸 해 봐요</span> 임계값과 청구 비율 π를 바꾸며 세 정확도가 어떻게 움직이는지 본다</p></a><a class="card stop" href="3_problems_fixes.html" style="--kc:var(--data);text-decoration:none;color:inherit"><img class="pic" src="assets/c3.webp" alt="" width="720" height="660" loading="lazy">
+<span class="no">EPISODE 3 · 문항 3 · 방법형</span><h3>그 숫자를 성능이라 부르면 생기는 일</h3><p class="cap">청구자 정확도만 보고하면 생기는 문제 5가지와 1:1 개선 방안. 신뢰구간 · PR-AUC · 청구율별 정밀도 · 중첩 교차검증으로 확인한다.</p><p><span class="tagx">이런 걸 해 봐요</span> “모두 청구” 모델, 신뢰구간 계산기, 청구율 슬라이더로 문제를 직접 재현한다</p></a><a class="card stop" href="4_html_deploy.html" style="--kc:var(--seq);text-decoration:none;color:inherit"><img class="pic" src="assets/c4.webp" alt="" width="720" height="660" loading="lazy">
+<span class="no">EPISODE 4 · 문항 4 · 정리형</span><h3>그 모델, HTML에 그대로 넣어도 될까</h3><p class="cap">결론부터: 그대로는 안 된다. 성별 빈칸 규칙 하나를 빼먹으면 시험 고객 52%의 판정이 바뀐다. 함께 내보낼 것과 대안 4가지.</p><p><span class="tagx">이런 걸 해 봐요</span> 전처리 규칙을 하나씩 끄며 브라우저 판정이 sklearn 과 얼마나 달라지는지 센다</p></a><a class="card stop" href="5_similar_cases.html" style="--kc:var(--data);text-decoration:none;color:inherit"><img class="pic" src="assets/c5.webp" alt="" width="720" height="660" loading="lazy">
+<span class="no">EPISODE 5 · 문항 5 · 정리형</span><h3>희소 이벤트는 어디에나 있다</h3><p class="cap">카드 사기 · 유방암 검진 · 디스크 고장 · 보험 사기. 같은 구조, 같은 함정, 실무 해결 전략과 우선순위 3개.</p><p><span class="tagx">이런 걸 해 봐요</span> 사례마다 기저율 · 민감도 · 특이도를 넣어 정밀도(PPV)를 계산해 본다</p></a></div><h3>편과 편을 잇는 질문</h3><ul><li><b>1 → 2</b> · “청구자만 놓고 정확도”를 따로 내라는데요? 그건 또 뭐예요?</li><li><b>2 → 3</b> · 청구자만 정확도 72%를 그대로 성능이라고 써도 돼요? 모두 청구라고 하면 100%던데…</li><li><b>3 → 4</b> · 숫자는 정직해졌어요. 그럼 이 모델을 HTML 파일 하나에 그대로 넣으면 돼요?</li><li><b>4 → 5</b> · 이런 희소 이벤트 문제, 우리 보험만 겪는 거예요?</li></ul></div></div></section><section class="part" id="how"><div class="wrap"><div class="part-head" style="--kc:var(--seq)"><div class="hex">?</div><h2>보는 법<span class="en">How to use</span></h2><p>처음 오신 분을 위한 안내.</p></div><div class="body"><ul><li><b>순서대로:</b> 1편 → 5편. 2·3편은 1편 정식 코드(f1.py)가 만드는 5-Fold 검증 예측을 씁니다.</li>
+<li><b>숫자 읽는 법:</b> 모든 점수는 기준선과 함께, fold 평균 ± 표준편차로 읽습니다. fold 하나의 청구자는 185명이라 한 명이 약 0.5%포인트입니다.</li>
+<li><b>Colab 실행:</b> 각 편 “실무로 잇기”에서 .py 나 .ipynb 를 받습니다. 초보용(e)은 함수·반복문·들여쓰기 없이, 정식 코드(f)는 공통 코드 common.py 를 씁니다.</li>
+<li><b>답안 틀:</b> 각 편 끝의 점선 상자는 과제 보고서 형식의 예시입니다. 숫자는 꼭 본인 실행 결과로 바꾸세요.</li>
+<li><b>강사라면:</b> “교육자용 정답”에 확인 문제 정답 · 채점 기준 · 섹션별 강의 멘트 · 가이드라인이 있습니다.</li>
+<li><b>휴대폰:</b> 모두 볼 수 있지만 4편(브라우저 판정 실험)은 PC 를 권합니다.</li></ul></div></div></section><footer><div class="wrap"><p><b>AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전</b> · 글 · 안상선 ((주)M-Robo 대표)</p><p><b>설명용 모형인 것:</b> 이 시리즈는 공개 학습용 여행자보험 데이터(63,326건, 원 출처 fintech-data/Revolution 의 travel insurance.csv 를 이 저장소 data/travel_insurance.csv 로 복사)를 그대로 씁니다. 가상 데이터를 만들거나 데이터를 증강하지 않습니다. 브라우저 실습은 교육용 구현이라 정식 코드와 숫자가 조금 다를 수 있으며, 다른 경우 그 자리에 밝힙니다.</p><p><b>주의:</b> 교육용 예시이며 보험 가입·보험료·보상에 대한 조언이 아닙니다. 실제 보험 심사와 보험료 산정은 감독 규정과 계리 기준을 따릅니다. 특정 집단에 불리한 특성(예: 성별·나이)의 사용은 금지되거나 제한될 수 있습니다.</p>
+<p><a href="https://creativecommons.org/licenses/by-nc/4.0/deed.ko">CC BY-NC 4.0</a> — 출처 표기 예: “AI(인공지능) x 비즈니스 #1 인슈어테크_02_분류모델_실전, 글 · 안상선 ((주)M-Robo 대표), CC BY-NC 4.0”</p></div></footer>
+<p id="lang-note" class="note" hidden style="position:fixed;bottom:12px;left:12px;right:12px;z-index:30"></p>
+<script>const SITE="https://adminmrobo.github.io/ai-biz-insurtech-02/";
+// ---------- 공통: 테마 색 읽기 ----------
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+const REDRAW=[];function onTheme(f){REDRAW.push(f)}
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>REDRAW.forEach(f=>f()))}catch(e){}
+new MutationObserver(()=>REDRAW.forEach(f=>f())).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+// 캔버스 준비 (선명하게)
+function prep(cv,h){const r=cv.getBoundingClientRect();const w=Math.max(200,r.width||cv.parentNode.clientWidth||600);const d=window.devicePixelRatio||1;cv.width=w*d;cv.height=h*d;cv.style.height=h+'px';const c=cv.getContext('2d');c.setTransform(d,0,0,d,0,0);return {c,w,h}}
+let RZ;addEventListener('resize',()=>{clearTimeout(RZ);RZ=setTimeout(()=>REDRAW.forEach(f=>f()),150)});
+const fmtP=(x,d=1)=>(x*100).toFixed(d)+'%';
+const nf=n=>Number(n).toLocaleString('en-US');
+// ---------- 확인 문제 ----------
+document.querySelectorAll('.q').forEach(q=>{const ok=q.dataset.ok,fb=q.querySelector('.fb');q.querySelectorAll('.opts button').forEach(b=>b.addEventListener('click',()=>{
+ q.querySelectorAll('.opts button').forEach(x=>x.classList.remove('right','wrong'));
+ if(b.dataset.i===ok){b.classList.add('right');fb.innerHTML='<b>정답입니다.</b> '+q.dataset.ex}else{b.classList.add('wrong');fb.innerHTML='<b>다시 생각해 보세요.</b> '+(b.dataset.why||'')}}))});
+// ---------- 복사 · 내려받기 ----------
+function copyTxt(t,btn){const o=btn.textContent;const done=()=>{btn.textContent='복사됨';setTimeout(()=>btn.textContent=o,1300)};try{navigator.clipboard.writeText(t).then(done,()=>{btn.textContent='직접 선택해 복사하세요'})}catch(e){btn.textContent='직접 선택해 복사하세요'}}
+function saveFile(name,text,type){try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type||'text/plain'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}catch(e){}}
+function toIpynb(src,formal){const lines=src.split('\n');const cells=[];let cur=[];
+ lines.forEach(l=>{if(/^# [①-⑳]/.test(l)&&cur.join('').trim()){cells.push(cur);cur=[]}cur.push(l)});if(cur.join('').trim())cells.push(cur);
+ const mk=a=>{while(a.length&&!a[a.length-1].trim())a.pop();return {cell_type:'code',metadata:{},execution_count:null,outputs:[],source:a.map((l,i)=>i<a.length-1?l+'\n':l)}};
+ const out=cells.map(mk).filter(c=>c.source.join('').trim());
+ if(formal)out.unshift(mk(['# 공통 코드 내려받기 (Colab)','!wget -q -O common.py '+SITE+'code/common.py']));
+ return JSON.stringify({cells:out,metadata:{kernelspec:{name:'python3',display_name:'Python 3'},language_info:{name:'python'}},nbformat:4,nbformat_minor:5},null,1)}
+document.querySelectorAll('.codebox').forEach(box=>{const tabs=[...box.querySelectorAll('.tabs button')];const pre=box.querySelector('pre code');const info=box.querySelector('.tools span');
+ let curId=null;function show(b){tabs.forEach(t=>t.setAttribute('aria-selected',t===b?'true':'false'));curId=b.dataset.src;const s=document.getElementById(curId);pre.textContent=s.textContent.replace(/^\n/,'');info.textContent=b.dataset.info||''}
+ tabs.forEach(t=>t.addEventListener('click',()=>show(t)));if(tabs[0])show(tabs[0]);
+ box.querySelector('[data-act=copy]').addEventListener('click',e=>copyTxt(pre.textContent,e.currentTarget));
+ box.querySelector('[data-act=py]').addEventListener('click',()=>{const s=document.getElementById(curId);saveFile(s.dataset.file,pre.textContent,'text/x-python')});
+ box.querySelector('[data-act=nb]').addEventListener('click',()=>{const s=document.getElementById(curId);saveFile(s.dataset.file.replace(/\.py$/,'.ipynb'),toIpynb(pre.textContent,s.dataset.formal==='1'),'application/json')})});
+document.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',e=>copyTxt(document.getElementById(b.dataset.copy).textContent,e.currentTarget)));
+document.querySelectorAll('[data-save]').forEach(b=>b.addEventListener('click',()=>saveFile(b.dataset.name,document.getElementById(b.dataset.save).textContent)));
+// ---------- 상태 캐릭터 ----------
+function robo(id,st){const w=document.getElementById(id);if(!w||w.dataset.st===st)return;w.dataset.st=st;w.querySelectorAll('[data-rs]').forEach(e=>e.hidden=e.dataset.rs!==st)}
+// ---------- 식구 카드: 모습 바꾸기 ----------
+document.querySelectorAll('.crew .moods button').forEach(b=>b.addEventListener('click',()=>{const card=b.closest('.crew');
+ card.querySelectorAll('.moods button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+ card.querySelectorAll('.cf').forEach(f=>f.classList.toggle('on',f.dataset.face===b.dataset.fb))}));
+// ---------- 막대 (기준선 포함) ----------
+function setBar(el,v,base){el.querySelector('.fill').style.width=Math.max(0,Math.min(1,v))*100+'%';const bl=el.querySelector('.base');if(bl){if(base==null)bl.hidden=true;else{bl.hidden=false;bl.style.left='calc('+base*100+'% - 1px)'}}el.querySelector('.v').textContent=fmtP(v)}
+// ---------- 혼동행렬 ----------
+function cmHTML(m){return `<div></div><div class="h">판정: 청구 없음</div><div class="h">판정: 청구 위험</div>
+ <div class="h rh">실제 미청구</div><div class="c ok"><b>${nf(m.tn)}</b><span>정상 통과</span></div><div class="c"><b>${nf(m.fp)}</b><span>추가 심사 (오탐)</span></div>
+ <div class="h rh">실제 청구</div><div class="c bad"><b>${nf(m.fn)}</b><span>⚠ 놓친 청구</span></div><div class="c ok"><b>${nf(m.tp)}</b><span>찾은 청구</span></div>`}
+
+</script>
+</body>
+</html>
